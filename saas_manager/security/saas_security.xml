@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        
+        <!-- SaaS Manager Categories -->
+        <record id="module_category_saas_manager" model="ir.module.category">
+            <field name="name">SaaS Manager</field>
+            <field name="description">Manage SaaS instances and subscriptions</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- SaaS Manager User -->
+        <record id="group_saas_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="category_id" ref="module_category_saas_manager"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Read-only access to instances. Cannot create or modify.</field>
+        </record>
+
+        <!-- SaaS Manager Manager -->
+        <record id="group_saas_manager" model="res.groups">
+            <field name="name">Manager</field>
+            <field name="category_id" ref="module_category_saas_manager"/>
+            <field name="implied_ids" eval="[(4, ref('group_saas_user'))]"/>
+            <field name="comment">CRUD access to instances and subscriptions. No access to templates/plans configuration.</field>
+        </record>
+
+        <!-- SaaS Manager Administrator -->
+        <record id="group_saas_admin" model="res.groups">
+            <field name="name">Administrator</field>
+            <field name="category_id" ref="module_category_saas_manager"/>
+            <field name="implied_ids" eval="[(4, ref('group_saas_manager'))]"/>
+            <field name="comment">Full access including templates, plans, and system configuration.</field>
+        </record>
+
+        <!-- Multi-company Rules -->
+        <record id="saas_instance_comp_rule" model="ir.rule">
+            <field name="name">SaaS Instance: multi-company</field>
+            <field name="model_id" ref="model_saas_instance"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="saas_subscription_comp_rule" model="ir.rule">
+            <field name="name">SaaS Subscription: multi-company</field>
+            <field name="model_id" ref="model_saas_subscription"/>
+            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        </record>
+
+    </data>
+</odoo>
