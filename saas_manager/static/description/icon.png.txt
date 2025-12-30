@@ -1,0 +1,1 @@
+Icon placeholder - Use a proper 128x128 PNG icon in production
