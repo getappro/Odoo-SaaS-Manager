@@ -33,18 +33,7 @@
             <field name="comment">Full access including templates, plans, and system configuration.</field>
         </record>
 
-        <!-- Multi-company Rules -->
-        <record id="saas_instance_comp_rule" model="ir.rule">
-            <field name="name">SaaS Instance: multi-company</field>
-            <field name="model_id" ref="model_saas_instance"/>
-            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
-        </record>
 
-        <record id="saas_subscription_comp_rule" model="ir.rule">
-            <field name="name">SaaS Subscription: multi-company</field>
-            <field name="model_id" ref="model_saas_subscription"/>
-            <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
-        </record>
 
     </data>
 </odoo>
