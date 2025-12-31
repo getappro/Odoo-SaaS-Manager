@@ -21,6 +21,12 @@ Multi-DB SaaS management module with PostgreSQL template cloning for ultra-fast 
   │   ├── template_services (Master DB - created via RPC)
   │   ├── client1 (Clone - psycopg2 TEMPLATE)
   │   ├── client2 (Clone - psycopg2 TEMPLATE)
+  │   ├── template_blank (Master DB)
+  │   ├── template_restaurant (Master DB)
+  │   ├── template_ecommerce (Master DB)
+  │   ├── template_services (Master DB)
+  │   ├── client1 (Clone)
+  │   ├── client2 (Clone)
   │   └── clientN (Clones...)
   └── Automatic routing: client1.example.com → DB "client1"
 ```
@@ -61,6 +67,7 @@ Multi-DB SaaS management module with PostgreSQL template cloning for ultra-fast 
 - psycopg2 Python package (for template cloning)
 - requests Python package (for RPC API calls)
 - Network access to Odoo RPC endpoint
+- psycopg2 Python package
 
 ### Installation Steps
 
@@ -72,6 +79,7 @@ Multi-DB SaaS management module with PostgreSQL template cloning for ultra-fast 
    ```
 
 2. **Update Odoo configuration** (see CONFIGURATION.md and RPC_API_GUIDE.md)
+2. **Update Odoo configuration** (see CONFIGURATION.md)
    ```ini
    [options]
    dbfilter = ^%h$  # ESSENTIAL for subdomain routing
@@ -100,6 +108,9 @@ Multi-DB SaaS management module with PostgreSQL template cloning for ultra-fast 
    - Set `saas.base_domain` to your domain (e.g., `example.com`)
    - Verify `web.base.url` is set correctly (e.g., `http://localhost:8069`)
    - Ensure `admin_passwd` in odoo.conf is configured (required for RPC)
+6. **Configure Base Domain**
+   - Go to Settings → Technical → Parameters → System Parameters
+   - Set `saas.base_domain` to your domain (e.g., `example.com`)
 
 ## 🚀 Usage
 
@@ -129,6 +140,19 @@ Templates are master PostgreSQL databases created via **Odoo's RPC API** that se
 
 **Available Templates:**
 - **Blank** - Clean Odoo installation (base, web, mail, portal)
+Templates are master PostgreSQL databases that serve as blueprints for client instances.
+
+**Steps:**
+1. Go to **SaaS Manager → Configuration → Templates**
+2. Select a template (e.g., "Restaurant Template")
+3. Click **Create Template DB** (TODO Phase 2)
+4. Access the template database
+5. Install desired modules and configure
+6. Add demo data if needed
+7. Mark template as ready
+
+**Available Templates:**
+- **Blank** - Clean Odoo installation
 - **Restaurant** - POS + Stock + Purchasing + Accounting
 - **E-commerce** - Website + E-commerce + Sales + Inventory
 - **Services** - Project + Timesheet + Sales + Invoicing
@@ -259,12 +283,34 @@ Plans define pricing tiers and resource limits.
 ### TODO: Phase 2 Implementation
 
 **Instance Customization (requires odoorpc or RPC extension):**
+- **Provisioning Time:** ~10 seconds (vs 120s traditional)
+- **Infrastructure Cost:** -90% vs container-per-client
+- **Server Capacity:** 100+ clients on 64GB RAM
+- **Resource Efficiency:** 24GB for 100 clients
+
+### Comparison
+
+| Architecture | RAM Usage | Provisioning | Cost |
+|--------------|-----------|--------------|------|
+| **Multi-DB Template** | 24GB for 100 clients | 10s | 1 server |
+| Docker per client | 200GB for 100 clients | 60-120s | Multiple servers |
+
+## 🔧 Phase 2 Implementation
+
+The following functions are marked as TODO and require implementation:
+
+### Database Operations (psycopg2)
+- `_clone_template_database()` - PostgreSQL template cloning
+- Database deletion for terminated instances
+
+### Instance Customization (odoorpc)
 - `_neutralize_database()` - Data sanitization
 - `_customize_instance()` - Client-specific customization
 - `_create_client_admin()` - Admin user creation
 - User count and storage metrics
 
 **Infrastructure:**
+### Infrastructure (System)
 - `_configure_subdomain()` - DNS/reverse proxy configuration
 - SSL certificate management
 - Wildcard DNS setup
@@ -298,6 +344,25 @@ def clone_template_db(self, new_db_name):
             sql.Identifier(self.template_db),
             sql.Identifier(db_user)
         )
+### Example Implementation
+
+```python
+def _clone_template_database(self):
+    """Clone PostgreSQL template"""
+    import psycopg2
+    
+    conn = psycopg2.connect(
+        dbname='postgres',
+        user='odoo',
+        password='***',
+        host='localhost'
+    )
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        f"CREATE DATABASE {self.database_name} "
+        f"WITH TEMPLATE {self.template_id.template_db}"
     )
     
     cursor.close()
@@ -331,6 +396,9 @@ See `saas_manager/models/saas_template.py` lines 422-515 for full implementation
 - **CONFIGURATION.md** - Detailed setup guide including RPC configuration
 - **QUICKSTART.md** - Quick start guide with RPC-based template creation
 - **IMPLEMENTATION_SUMMARY.md** - Technical overview and implementation status
+## 📚 Additional Documentation
+
+- **CONFIGURATION.md** - Detailed setup guide
 - **Module Description** - `static/description/index.html`
 - **Inline Code Comments** - Comprehensive docstrings
 
@@ -348,6 +416,10 @@ See `saas_manager/models/saas_template.py` lines 422-515 for full implementation
 - Verify template database exists and `is_template_ready = True`
 - Review Odoo logs for psycopg2 errors
 - Ensure template database is marked as template in PostgreSQL
+### Instance Provisioning Fails
+- Check PostgreSQL permissions
+- Verify template database exists and is ready
+- Review Odoo logs for errors
 
 ### Subdomain Not Working
 - Verify `dbfilter = ^%h$` in odoo.conf
@@ -378,6 +450,8 @@ LGPL-3 (same as Odoo)
   - [x] Module installation via RPC
   - [x] Template cloning via PostgreSQL TEMPLATE
 - [ ] Phase 2: Instance customization (neutralize, customize, admin creation)
+- [x] Phase 1: Complete module structure with TODO placeholders
+- [ ] Phase 2: Implement provisioning functions (psycopg2 + odoorpc)
 - [ ] Phase 3: Public registration portal
 - [ ] Phase 4: Customer dashboard
 - [ ] Phase 5: Advanced monitoring and analytics

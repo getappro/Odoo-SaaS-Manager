@@ -104,6 +104,15 @@ After installation:
 **See:** `RPC_API_GUIDE.md` for detailed troubleshooting
 
 ### Step 7: Explore Other Features (2 minutes)
+### Step 6: Explore the Module (2 minutes)
+
+Access the **SaaS Manager** main menu to explore:
+
+#### Templates
+- **Menu:** SaaS Manager → Configuration → Templates
+- **What to see:** 4 pre-configured templates (Blank, Restaurant, E-commerce, Services)
+- **Try:** Click on a template, view its description
+- **Note:** "Create Template DB" button shows TODO Phase 2 message
 
 #### Plans
 - **Menu:** SaaS Manager → Configuration → Plans
@@ -120,6 +129,9 @@ After installation:
   - Template: "Blank Template" (or the one you created)
   - Plan: "Professional"
 - **Note:** "Provision Instance" button still shows TODO (Phase 2)
+  - Template: "Restaurant Template"
+  - Plan: "Professional"
+- **Note:** "Provision Instance" button shows TODO Phase 2 message
 
 #### Subscriptions
 - **Menu:** SaaS Manager → Operations → Subscriptions
@@ -127,6 +139,7 @@ After installation:
 - **Try:** Create a subscription for your test instance
 
 ## ✅ What Works Now (Phase 1.5 - RPC Implementation)
+## What Works Now (Without Phase 2)
 
 ✅ **Fully Functional:**
 - Module installation
@@ -145,6 +158,11 @@ After installation:
 - Instance provisioning (clone + customize)
 - Database neutralization
 - Client admin user creation
+
+⏳ **Shows TODO Message (Phase 2 Required):**
+- Template database creation
+- Instance provisioning
+- Database cloning
 - Subdomain configuration
 - User/storage metrics
 - Actual instance access
@@ -200,6 +218,7 @@ grep -r "TODO Phase 2" saas_manager/models/
    - Verify `is_template_ready` is checked ✓
 
 3. **Create an instance:**
+2. **Create an instance:**
    - SaaS Manager → Operations → Instances → Create
    - Name: "Test Instance"
    - Customer: "Test Company"
@@ -214,6 +233,16 @@ grep -r "TODO Phase 2" saas_manager/models/
 
 5. **Try state transitions:**
    - Click "Provision Instance" (still shows TODO message - Phase 2)
+   - Template: "Restaurant Template"
+   - Plan: "Professional"
+   - Save
+
+3. **Observe the computed fields:**
+   - Domain: `testcompany.example.com` (auto-computed)
+   - State: `draft` (initial state)
+
+4. **Try state transitions:**
+   - Click "Provision Instance" (shows TODO message)
    - Manually change state to "Active"
    - Try "Suspend" button
    - Try "Reactivate" button
@@ -265,6 +294,19 @@ subprocess.run(['sudo', '-u', 'postgres', 'psql', '-c', '\\l'])
 **What's Still TODO:**
 
 ### 1. Instance Customization (`odoorpc` or RPC extension)
+## Next Steps: Phase 2 Implementation
+
+To make the module fully functional, implement these TODO functions:
+
+### 1. Database Operations (`psycopg2`)
+```python
+# saas_manager/models/saas_instance.py
+def _clone_template_database(self):
+    # Implement PostgreSQL template cloning
+    # CREATE DATABASE client1 WITH TEMPLATE template_restaurant
+```
+
+### 2. Instance Customization (`odoorpc`)
 ```python
 def _neutralize_database(self):
     # Reset passwords, anonymize demo data
@@ -277,6 +319,13 @@ def _create_client_admin(self):
 ```
 
 ### 2. Infrastructure
+    # Apply customer branding
+    
+def _create_client_admin(self):
+    # Create admin user with credentials
+```
+
+### 3. Infrastructure
 ```python
 def _configure_subdomain(self):
     # Configure DNS and reverse proxy
@@ -284,6 +333,7 @@ def _configure_subdomain(self):
 ```
 
 ### 3. Monitoring
+### 4. Monitoring
 ```python
 def _compute_current_users(self):
     # Query instance database for user count
@@ -368,6 +418,10 @@ http://localhost:8069/web?db=template_blank
 - **RPC_API_GUIDE.md** - Complete RPC API reference and troubleshooting
 - **README.md** - Complete feature documentation
 - **CONFIGURATION.md** - Production setup guide (includes RPC configuration)
+## Documentation
+
+- **README.md** - Complete feature documentation
+- **CONFIGURATION.md** - Production setup guide
 - **IMPLEMENTATION_SUMMARY.md** - Technical overview
 - **This file** - Quick start for testing
 
@@ -379,6 +433,10 @@ For implementation help:
 3. Review IMPLEMENTATION_SUMMARY.md for technical overview
 4. See example implementations in code comments
 5. Consult CONFIGURATION.md for infrastructure setup
+1. Check inline code comments (detailed TODOs)
+2. Review IMPLEMENTATION_SUMMARY.md
+3. See example implementations in code comments
+4. Consult CONFIGURATION.md for infrastructure setup
 
 ## Success Checklist
 

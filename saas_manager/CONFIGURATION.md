@@ -80,6 +80,8 @@ dbfilter_from_header = False
 # This is used by RPC API to create template databases
 # MUST be a strong password in production
 admin_passwd = CHANGE_ME_STRONG_PASSWORD  # 20+ characters recommended
+# Admin password (CHANGE IN PRODUCTION)
+admin_passwd = CHANGE_ME_STRONG_PASSWORD
 
 # ========================================
 # LOGGING
@@ -108,6 +110,7 @@ db_name = False  # Required for multi-db
 
 # ========================================
 # NETWORK (RPC API REQUIRED)
+# NETWORK
 # ========================================
 
 http_interface = 0.0.0.0
@@ -116,6 +119,12 @@ proxy_mode = True  # Essential for reverse proxy
 
 # RPC endpoint available at: http://localhost:8069/jsonrpc
 # Used for template database creation via RPC API
+# ========================================
+# XMLRPC (for odoorpc provisioning)
+# ========================================
+
+xmlrpc_interface = 127.0.0.1
+xmlrpc_port = 8069
 ```
 
 ### Restart Odoo
@@ -206,6 +215,12 @@ After module installation:
 
 ```bash
 # Option 2: Manual creation (not recommended - skips module installation)
+```bash
+# Option 1: Via Odoo UI (after module installation)
+# Go to SaaS Manager → Configuration → Templates
+# Click "Create Template DB" on each template
+
+# Option 2: Manual creation (for testing)
 sudo -u postgres psql
 
 CREATE DATABASE template_blank WITH OWNER odoo;
@@ -396,6 +411,11 @@ Value: example.com
 Key: web.base.url
 Value: http://localhost:8069  (or https://your-domain.com in production)
 Description: REQUIRED for RPC template creation - used to construct RPC endpoint URL
+Key: saas.odoo_host
+Value: localhost
+
+Key: saas.odoo_port
+Value: 8069
 ```
 
 ### 2. Email Configuration
@@ -873,6 +893,8 @@ ps aux | grep odoo-bin
 - [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [PostgreSQL Template Databases](https://www.postgresql.org/docs/current/manage-ag-templatedbs.html)
+- [Odoo Documentation](https://www.odoo.com/documentation/18.0/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [Nginx Documentation](https://nginx.org/en/docs/)
 - [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
 
@@ -883,5 +905,7 @@ For configuration assistance:
 - Review Odoo logs (`/var/log/odoo/odoo-server.log`)
 - Check PostgreSQL logs (`/var/log/postgresql/`)
 - Test RPC endpoint with curl commands (see above)
+- Review Odoo logs
+- Check PostgreSQL logs
 - Consult system administrator
 - Contact implementation partner
