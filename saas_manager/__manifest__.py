@@ -36,7 +36,7 @@
         'portal',
     ],
     'external_dependencies': {
-        'python': ['psycopg2'],
+        'python': ['psycopg2', 'requests'],
     },
     'data': [
         # Security
@@ -48,6 +48,7 @@
         'data/ir_sequence.xml',
         
         # Master data
+        'data/saas_server_data.xml',
         'data/saas_template_data.xml',
         'data/saas_plan_data.xml',
         
@@ -56,18 +57,19 @@
         'data/mail_template_data.xml',
         
         # Views
+        'views/saas_server_views.xml',
         'views/saas_template_views.xml',
         'views/saas_plan_views.xml',
         'views/saas_instance_views.xml',
         'views/saas_subscription_views.xml',
-        'views/saas_dashboard_views.xml',
+        #'views/saas_dashboard_views.xml',
         'views/saas_menu.xml',
     ],
     'assets': {
-        'web.assets_backend': [
-            'saas_manager/static/src/css/saas_dashboard.css',
-            'saas_manager/static/src/js/saas_dashboard.js',
-        ],
+    #   'web.assets_backend': [
+    #        'saas_manager/static/src/css/saas_dashboard.css',
+    #        'saas_manager/static/src/js/saas_dashboard.js',
+    #    ],
         'web.assets_frontend': [
             'saas_manager/static/src/css/saas_portal.css',
             'saas_manager/static/src/js/saas_portal.js',
