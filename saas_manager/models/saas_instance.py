@@ -81,6 +81,14 @@ class SaaSInstance(models.Model):
         ondelete='restrict',
         help="Subscription plan"
     )
+    server_id = fields.Many2one(
+        'saas.server',
+        string='Server',
+        required=True,
+        tracking=True,
+        ondelete='restrict',
+        help="Server hosting this instance"
+    )
     state = fields.Selection([
         ('draft', 'Draft'),
         ('provisioning', 'Provisioning'),
