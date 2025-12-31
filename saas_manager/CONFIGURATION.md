@@ -76,8 +76,10 @@ limit_time_real = 1200
 list_db = False  # Disable database list for security
 dbfilter_from_header = False
 
-# Admin password (CHANGE IN PRODUCTION)
-admin_passwd = CHANGE_ME_STRONG_PASSWORD
+# Admin password (REQUIRED FOR RPC TEMPLATE CREATION)
+# This is used by RPC API to create template databases
+# MUST be a strong password in production
+admin_passwd = CHANGE_ME_STRONG_PASSWORD  # 20+ characters recommended
 
 # ========================================
 # LOGGING
@@ -105,19 +107,15 @@ db_password = CHANGE_ME_DB_PASSWORD
 db_name = False  # Required for multi-db
 
 # ========================================
-# NETWORK
+# NETWORK (RPC API REQUIRED)
 # ========================================
 
 http_interface = 0.0.0.0
 http_port = 8069
 proxy_mode = True  # Essential for reverse proxy
 
-# ========================================
-# XMLRPC (for odoorpc provisioning)
-# ========================================
-
-xmlrpc_interface = 127.0.0.1
-xmlrpc_port = 8069
+# RPC endpoint available at: http://localhost:8069/jsonrpc
+# Used for template database creation via RPC API
 ```
 
 ### Restart Odoo
@@ -183,12 +181,31 @@ sudo systemctl status postgresql
 
 ### 3. Create Template Databases
 
-```bash
-# Option 1: Via Odoo UI (after module installation)
-# Go to SaaS Manager → Configuration → Templates
-# Click "Create Template DB" on each template
+**RECOMMENDED: Via Odoo UI (RPC-based - Automatic)**
 
-# Option 2: Manual creation (for testing)
+After module installation:
+1. Go to **SaaS Manager → Configuration → Templates**
+2. Select a template (e.g., "Restaurant Template")
+3. Click **"Create Template DB"** button
+4. Wait 5-10 minutes for completion
+5. Template will be automatically marked as "Ready" ✓
+6. Base modules (base, web, mail, portal) are pre-installed
+
+**What happens behind the scenes:**
+- Creates PostgreSQL database via RPC (`/jsonrpc` endpoint)
+- Authenticates to new database
+- Installs base modules automatically
+- Sets `is_template_ready = True`
+
+**Requirements for RPC approach:**
+- `web.base.url` system parameter configured
+- `admin_passwd` in odoo.conf configured
+- RPC endpoint accessible
+
+**Manual PostgreSQL Creation (Legacy/Testing only)**
+
+```bash
+# Option 2: Manual creation (not recommended - skips module installation)
 sudo -u postgres psql
 
 CREATE DATABASE template_blank WITH OWNER odoo;
@@ -198,6 +215,24 @@ CREATE DATABASE template_services WITH OWNER odoo;
 
 # Mark as templates (optional - improves performance)
 UPDATE pg_database SET datistemplate = TRUE WHERE datname LIKE 'template_%';
+
+# Note: With manual creation, you must manually:
+# 1. Initialize each database with Odoo
+# 2. Install required modules
+# 3. Mark template as ready in SaaS Manager
+```
+
+**Verification:**
+
+```bash
+# Check templates exist
+sudo -u postgres psql -c "\l" | grep template_
+
+# Check template is ready (via Odoo shell)
+cd /path/to/odoo
+./odoo-bin shell -d your_main_db
+>>> env['saas.template'].search([('code', '=', 'restaurant')]).is_template_ready
+True
 ```
 
 ## 🌐 Reverse Proxy Configuration
@@ -358,11 +393,9 @@ Set the following:
 Key: saas.base_domain
 Value: example.com
 
-Key: saas.odoo_host
-Value: localhost
-
-Key: saas.odoo_port
-Value: 8069
+Key: web.base.url
+Value: http://localhost:8069  (or https://your-domain.com in production)
+Description: REQUIRED for RPC template creation - used to construct RPC endpoint URL
 ```
 
 ### 2. Email Configuration
@@ -387,6 +420,299 @@ Groups:
 - **SaaS Manager / User** - Read-only
 - **SaaS Manager / Manager** - CRUD instances
 - **SaaS Manager / Administrator** - Full access
+
+## 🔌 RPC API Configuration
+
+### Overview
+
+The SaaS Manager uses Odoo's **JSON-RPC API** for template database creation instead of subprocess or direct SQL. This provides better integration, security, and error handling.
+
+### Required Configuration
+
+#### 1. System Parameter: web.base.url
+
+**Location:** Settings → Technical → Parameters → System Parameters
+
+**Value:**
+```
+Development: http://localhost:8069
+Production: https://your-domain.com
+```
+
+**Purpose:**
+- Used to construct RPC endpoint URL (`{base_url}/jsonrpc`)
+- Must be accessible from the Odoo server itself
+- Used by `action_create_template_db()` method
+
+**Verification:**
+```bash
+# Test RPC endpoint is accessible
+curl -X POST http://localhost:8069/jsonrpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "service": "db",
+      "method": "list",
+      "args": []
+    },
+    "id": 1
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": ["database1", "database2", ...]
+}
+```
+
+#### 2. Master Password: admin_passwd
+
+**Location:** `/etc/odoo/odoo.conf` (or your odoo.conf path)
+
+**Configuration:**
+```ini
+[options]
+# CRITICAL: Required for RPC database creation
+admin_passwd = K9$mP2#vL8@nQ5&xR7!wT3yH6^bN4!mL5
+
+# DO NOT use default 'admin' in production
+# Generate strong password: openssl rand -base64 32
+```
+
+**Security Requirements:**
+- Minimum 20 characters
+- Mix of uppercase, lowercase, numbers, symbols
+- Never commit to version control
+- Rotate quarterly
+- Store in secure secrets management (production)
+
+**Generate Strong Password:**
+```bash
+# Option 1: OpenSSL
+openssl rand -base64 32
+
+# Option 2: Python
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Option 3: pwgen (if installed)
+pwgen -s 32 1
+```
+
+**Environment Variable Approach (Recommended for Production):**
+```bash
+# /etc/systemd/system/odoo.service
+[Service]
+Environment="ADMIN_PASSWD=your_strong_password_here"
+ExecStart=/usr/bin/odoo-bin --config=/etc/odoo/odoo.conf
+
+# odoo.conf
+[options]
+admin_passwd = ${ADMIN_PASSWD}
+```
+
+#### 3. Network Access Configuration
+
+**Firewall Rules:**
+
+For **development** (local only):
+```bash
+# Allow RPC only from localhost
+sudo ufw deny 8069/tcp
+sudo ufw allow from 127.0.0.1 to any port 8069
+```
+
+For **production** (with reverse proxy):
+```bash
+# RPC should only be accessible internally
+# External access via reverse proxy only
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw deny 8069/tcp
+sudo ufw allow from 10.0.0.0/8 to any port 8069  # Internal network
+```
+
+**Reverse Proxy Configuration (Nginx):**
+
+Restrict `/jsonrpc` endpoint to internal use only:
+
+```nginx
+# /etc/nginx/sites-available/saas-manager
+
+server {
+    listen 443 ssl http2;
+    server_name example.com *.example.com;
+    
+    # ... SSL configuration ...
+    
+    # Restrict RPC endpoint to internal IPs
+    location /jsonrpc {
+        # Allow from internal network only
+        allow 127.0.0.1;
+        allow 10.0.0.0/8;
+        allow 192.168.0.0/16;
+        deny all;
+        
+        proxy_pass http://localhost:8069;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Increase timeout for database creation
+        proxy_read_timeout 600s;
+        proxy_connect_timeout 600s;
+    }
+    
+    # Public endpoints
+    location / {
+        proxy_pass http://localhost:8069;
+        # ... standard proxy settings ...
+    }
+}
+```
+
+### RPC Testing & Verification
+
+#### Test 1: List Databases
+
+```bash
+curl -X POST http://localhost:8069/jsonrpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "service": "db",
+      "method": "list",
+      "args": []
+    },
+    "id": 1
+  }'
+```
+
+**Expected Output:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": ["saas_manager_main", "template_blank", ...]
+}
+```
+
+#### Test 2: Get Odoo Version
+
+```bash
+curl -X POST http://localhost:8069/jsonrpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "service": "common",
+      "method": "version",
+      "args": []
+    },
+    "id": 1
+  }'
+```
+
+**Expected Output:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "server_version": "18.0",
+    "server_version_info": [18, 0, 0, "final", 0],
+    "protocol_version": 1
+  }
+}
+```
+
+#### Test 3: Test Authentication (Optional)
+
+```bash
+curl -X POST http://localhost:8069/jsonrpc \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "call",
+    "params": {
+      "service": "common",
+      "method": "login",
+      "args": ["your_database", "admin", "admin"]
+    },
+    "id": 1
+  }'
+```
+
+**Expected Output:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": 2  // user_id
+}
+```
+
+### RPC Security Best Practices
+
+1. **Master Password Security**
+   - Never use default 'admin' password
+   - Use password manager for generation
+   - Store in environment variables or secrets manager
+   - Rotate password quarterly
+   - Monitor access logs
+
+2. **Network Restrictions**
+   - Limit RPC access to localhost/internal network
+   - Use reverse proxy with IP whitelist
+   - Enable firewall rules
+   - Monitor failed RPC attempts
+
+3. **Audit Logging**
+   - Enable detailed logging for RPC calls
+   - Monitor template creation events
+   - Alert on failed RPC authentication
+   - Regular log review
+
+4. **SSL/TLS**
+   - Always use HTTPS in production
+   - Valid SSL certificates
+   - TLS 1.2 or higher
+   - Strong cipher suites
+
+### RPC Troubleshooting
+
+#### Error: "Failed to connect to Odoo RPC endpoint"
+
+**Check:**
+1. Verify Odoo is running: `sudo systemctl status odoo`
+2. Check `web.base.url` parameter
+3. Test RPC endpoint with curl (see tests above)
+4. Check firewall rules: `sudo ufw status`
+
+#### Error: "RPC Error while creating database"
+
+**Check:**
+1. Verify `admin_passwd` in odoo.conf
+2. Check if database already exists
+3. Review PostgreSQL permissions
+4. Check Odoo logs: `tail -f /var/log/odoo/odoo-server.log`
+
+#### Error: "Authentication failed via RPC"
+
+**Check:**
+1. Verify admin password (default: admin/admin for new DBs)
+2. Check if admin user exists
+3. Try resetting admin password
+
+**For complete troubleshooting guide, see:** `RPC_API_GUIDE.md`
 
 ## 🔒 Security Hardening
 
@@ -541,15 +867,21 @@ ps aux | grep odoo-bin
 
 ## 📚 Additional Resources
 
+- **RPC_API_GUIDE.md** - Complete RPC API reference and troubleshooting
 - [Odoo Documentation](https://www.odoo.com/documentation/18.0/)
+- [Odoo External API](https://www.odoo.com/documentation/18.0/developer/reference/external_api.html)
+- [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [PostgreSQL Template Databases](https://www.postgresql.org/docs/current/manage-ag-templatedbs.html)
 - [Nginx Documentation](https://nginx.org/en/docs/)
 - [Let's Encrypt Documentation](https://letsencrypt.org/docs/)
 
 ## 🤝 Support
 
 For configuration assistance:
-- Review Odoo logs
-- Check PostgreSQL logs
+- **RPC Issues:** See RPC_API_GUIDE.md for detailed troubleshooting
+- Review Odoo logs (`/var/log/odoo/odoo-server.log`)
+- Check PostgreSQL logs (`/var/log/postgresql/`)
+- Test RPC endpoint with curl commands (see above)
 - Consult system administrator
 - Contact implementation partner
