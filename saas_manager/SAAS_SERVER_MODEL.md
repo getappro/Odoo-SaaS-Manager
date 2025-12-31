@@ -144,7 +144,8 @@ def _get_default_server(self):
     Server = self.env['saas.server']
     try:
         return Server.get_available_server(min_capacity_percent=10)
-    except:
+    except UserError:
+        # If no server with 10% capacity, try to get any active server
         return Server.search([('state', '=', 'active')], limit=1)
 ```
 

@@ -57,8 +57,7 @@
                                 <field name="partner_id" widget="many2one_avatar_user"/>
                                 <field name="template_id" options="{'no_create': True}"/>
                                 <field name="plan_id" options="{'no_create': True}"/>
-                                <field name="server_id" options="{'no_create': True}" 
-                                       domain="[('state', '=', 'active'), '|', ('id', '=', template_id.server_id.id), ('id', '=', server_id)]"/>
+                                <field name="server_id" options="{'no_create': True}"/>
                             </group>
                             <group string="Technical">
                                 <field name="database_name"/>
