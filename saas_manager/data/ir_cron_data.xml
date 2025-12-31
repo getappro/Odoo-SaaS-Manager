@@ -49,5 +49,17 @@
             <field name="nextcall" eval="(DateTime.now() + timedelta(days=1)).replace(hour=1, minute=0, second=0)"/>
         </record>
 
+        <!-- CRON: Check Server Health (Hourly) -->
+        <record id="cron_check_server_health" model="ir.cron">
+            <field name="name">SaaS: Check Server Health</field>
+            <field name="model_id" ref="model_saas_server"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_check_all_servers_health()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="numbercall">-1</field>
+            <field name="active" eval="True"/>
+        </record>
+
     </data>
 </odoo>
