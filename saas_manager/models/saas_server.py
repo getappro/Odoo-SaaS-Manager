@@ -533,6 +533,22 @@ class SaaSServer(models.Model):
         return available_servers[0]
 
     @api.model
+    def cron_check_all_servers_health(self):
+        """
+        CRON: Vérifier la santé de tous les serveurs actifs.
+        CRON: Check health of all active servers.
+        """
+        _logger.info("Running server health check...")
+        
+        servers = self.search([('state', 'in', ['active', 'maintenance'])])
+        
+        for server in servers:
+            try:
+                server.action_check_health()
+            except Exception as e:
+                _logger.error(f"Health check failed for server {server.name}: {str(e)}")
+
+    @api.model
     def create(self, vals):
         """
         Override create to add additional logic.

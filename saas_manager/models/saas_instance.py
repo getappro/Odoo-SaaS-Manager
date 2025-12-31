@@ -87,6 +87,8 @@ class SaaSInstance(models.Model):
         required=True,
         tracking=True,
         ondelete='restrict',
+        domain="[('state', '=', 'active'), ('available_capacity', '>', 0)]",
+        default=lambda self: self._get_default_server(),
         help="Server hosting this instance"
     )
     state = fields.Selection([
@@ -170,6 +172,17 @@ class SaaSInstance(models.Model):
             else:
                 instance.domain = False
 
+    def _get_default_server(self):
+        """
+        Obtenir le serveur par défaut avec le plus de capacité disponible.
+        Get default server with most available capacity.
+        """
+        Server = self.env['saas.server']
+        try:
+            return Server.get_available_server(min_capacity_percent=10)
+        except:
+            return Server.search([('state', '=', 'active')], limit=1)
+
     def _compute_current_users(self):
         """
         Calcule le nombre d'utilisateurs actifs.
@@ -248,6 +261,22 @@ class SaaSInstance(models.Model):
         if not self.template_id.is_template_ready:
             raise UserError(_('Template %s is not ready for cloning.') % self.template_id.name)
         
+        # Validate server state
+        if self.server_id.state != 'active':
+            raise UserError(
+                _("Cannot provision instance on server '%s'.\n\n"
+                  "Server state is '%s'. Server must be 'active' to provision instances.\n\n"
+                  "Please activate the server or select a different server.") % (self.server_id.name, self.server_id.state)
+            )
+        
+        # Validate server capacity
+        if self.server_id.available_capacity < 10:
+            raise UserError(
+                _("Cannot provision instance on server '%s'.\n\n"
+                  "Server has only %.1f%% capacity available. Minimum 10%% required.\n\n"
+                  "Please select a different server or increase max instances on this server.") % (self.server_id.name, self.server_id.available_capacity)
+            )
+        
         try:
             # Update state to provisioning
             self.write({'state': 'provisioning'})
@@ -325,8 +354,22 @@ class SaaSInstance(models.Model):
             
             _logger.info(f"Database {target_db} cloned from {template_db}")
         """
-        _logger.info(f"TODO Phase 2: Clone {self.template_id.template_db} to {self.database_name}")
-        # Placeholder - actual implementation in Phase 2
+        # Validate that template and instance are on the same server
+        if self.template_id.server_id != self.server_id:
+            raise UserError(
+                _("Template and instance must be on the same server.\n\n"
+                  "Template '%s' is on server '%s'\n"
+                  "Instance '%s' is on server '%s'\n\n"
+                  "Please select a template on the same server or change the instance server.") % (
+                      self.template_id.name, self.template_id.server_id.name,
+                      self.name, self.server_id.name
+                  )
+            )
+        
+        _logger.info(f"Cloning template {self.template_id.template_db} to {self.database_name} on server {self.server_id.name}")
+        
+        # Call template's clone method which uses server's DB configuration
+        self.template_id.clone_template_db(self.database_name)
 
     def _neutralize_database(self):
         """

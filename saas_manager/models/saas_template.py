@@ -70,6 +70,13 @@ class SaaSTemplate(models.Model):
         tracking=True,
         help="Version of the template"
     )
+    server_id = fields.Many2one(
+        'saas.server',
+        string='Server',
+        required=True,
+        domain="[('state', '=', 'active')]",
+        help="Server where this template database is hosted"
+    )
     module_ids = fields.Many2many(
         'ir.module.module',
         string='Installed Modules',
@@ -321,10 +328,11 @@ class SaaSTemplate(models.Model):
         Create the PostgreSQL template database and initialize it via RPC.
 
         Steps:
-        1. Create database via RPC jsonrpc2 API
-        2. Authenticate to the database
-        3. Install base modules via RPC
-        4. Mark template as ready
+        1. Validate server is active
+        2. Create database via RPC jsonrpc2 API
+        3. Authenticate to the database
+        4. Install base modules via RPC
+        5. Mark template as ready
 
         Returns:
             dict: Notification action
@@ -334,19 +342,24 @@ class SaaSTemplate(models.Model):
         """
         self.ensure_one()
 
+        # Validate that server is active
+        if self.server_id.state != 'active':
+            raise UserError(
+                _("Cannot create template on server '%s'.\n\n"
+                  "Server state is '%s'. Server must be 'active' to create templates.\n\n"
+                  "Please activate the server first.") % (self.server_id.name, self.server_id.state)
+            )
+
         try:
             template_db_name = self.template_db
-            _logger.info(f"Starting template DB creation via RPC: {template_db_name}")
+            _logger.info(f"Starting template DB creation via RPC: {template_db_name} on server {self.server_id.name}")
 
-            # Get base URL from configuration
-            base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-            if not base_url:
-                base_url = config.get('web.base.url', 'http://localhost:8069')
+            # Get base URL from server configuration
+            base_url = self.server_id.server_url
+            _logger.info(f"Using server URL: {base_url}")
 
-            _logger.info(f"Using base URL: {base_url}")
-
-            # Get master password from configuration
-            master_password = config.get('admin_passwd', 'admin')
+            # Get master password from server configuration
+            master_password = self.server_id.master_password
 
             # Step 1: Create database via RPC
             self._create_template_db_via_rpc(base_url, template_db_name, master_password)
@@ -366,14 +379,14 @@ class SaaSTemplate(models.Model):
                 'is_template_ready': True,
             })
 
-            _logger.info(f"Template database created and ready: {template_db_name}")
+            _logger.info(f"Template database created and ready: {template_db_name} on server {self.server_id.name}")
 
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
                 'params': {
                     'title': _('Template Created Successfully'),
-                    'message': _('Template database "%s" has been created and initialized via RPC.') % template_db_name,
+                    'message': _('Template database "%s" has been created and initialized via RPC on server "%s".') % (template_db_name, self.server_id.name),
                     'type': 'success',
                     'sticky': False,
                 }
@@ -443,13 +456,13 @@ class SaaSTemplate(models.Model):
             )
 
         try:
-            # Get PostgreSQL connection parameters
-            db_host = config.get('db_host', 'localhost')
-            db_port = config.get('db_port', 5432)
-            db_user = config.get('db_user', 'odoo')
-            db_password = config.get('db_password', '')
+            # Get PostgreSQL connection parameters from server
+            db_host = self.server_id.db_host
+            db_port = self.server_id.db_port
+            db_user = self.server_id.db_user
+            db_password = self.server_id.db_password
 
-            _logger.info(f"Cloning template {self.template_db} to {new_db_name}")
+            _logger.info(f"Cloning template {self.template_db} to {new_db_name} on server {self.server_id.name}")
 
             # Connect to PostgreSQL
             conn_params = {
