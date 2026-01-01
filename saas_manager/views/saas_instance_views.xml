@@ -31,6 +31,7 @@
                                 type="object" 
                                 string="Terminate"
                                 confirm="Are you sure you want to terminate this instance? This action is irreversible."
+                                groups="saas_manager.group_saas_admin"
                                 invisible="state in ['terminated', 'draft']"/>
                         <field name="state" widget="statusbar" 
                                statusbar_visible="draft,provisioning,active"/>
@@ -58,6 +59,7 @@
                                 <field name="template_id" options="{'no_create': True}"/>
                                 <field name="plan_id" options="{'no_create': True}"/>
                                 <field name="server_id" options="{'no_create': True}"/>
+                                <field name="protocol"/>
                             </group>
                             <group string="Technical">
                                 <field name="database_name"/>

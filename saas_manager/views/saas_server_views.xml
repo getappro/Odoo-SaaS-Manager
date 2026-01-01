@@ -6,18 +6,18 @@
             <field name="name">saas.server.list</field>
             <field name="model">saas.server</field>
             <field name="arch" type="xml">
-                <tree string="SaaS Servers" decoration-info="state=='draft'" decoration-success="state=='active'" decoration-warning="state=='maintenance'" decoration-danger="state=='offline'">
+                <list string="SaaS Servers">
                     <field name="sequence" widget="handle"/>
                     <field name="name"/>
                     <field name="code"/>
                     <field name="server_url"/>
-                    <field name="state" badge="1" widget="badge"/>
+                    <field name="state" widget="badge"/>
                     <field name="is_online" widget="boolean"/>
                     <field name="instance_count"/>
                     <field name="available_capacity" widget="percentage"/>
-                    <field name="health_status" badge="1" widget="badge"/>
+                    <field name="health_status" widget="badge"/>
                     <field name="active" invisible="1"/>
-                </tree>
+                </list>
             </field>
         </record>
 
@@ -34,41 +34,42 @@
                     <field name="health_status"/>
                     <field name="instance_count"/>
                     <field name="available_capacity"/>
+                    <field name="max_instances"/>
                     <field name="last_check_date"/>
                     <templates>
                         <t t-name="kanban-box">
-                            <div class="oe_kanban_card" style="position: relative;">
+                            <div class="oe_kanban_card">
                                 <div class="oe_kanban_content">
                                     <div class="o_kanban_record_title">
-                                        <strong><field name="name"/></strong>
+                                        <strong><t t-out="record.name.value"/></strong>
                                     </div>
                                     <div class="o_kanban_record_subtitle">
-                                        <span class="badge badge-secondary" t-if="record.state.raw_value"><field name="state"/></span>
-                                        <span class="badge" t-if="record.is_online.raw_value" style="background-color: #28a745;">Online</span>
+                                        <span class="badge badge-secondary" t-if="record.state.value"><t t-out="record.state.value"/></span>
+                                        <span class="badge" t-if="record.is_online.value" style="background-color: #28a745;">Online</span>
                                         <span class="badge" t-else="" style="background-color: #dc3545;">Offline</span>
                                     </div>
-                                    <hr/>
+                                    <hr style="margin: 5px 0;"/>
                                     <div class="o_kanban_record_details">
                                         <p>
-                                            <strong>Instances:</strong> <field name="instance_count"/> / <field name="max_instances"/>
+                                            <strong>Instances:</strong> <t t-out="record.instance_count.value"/> / <t t-out="record.max_instances.value"/>
                                         </p>
                                         <p>
-                                            <strong>Capacity:</strong> <field name="available_capacity" widget="percentage"/>
+                                            <strong>Capacity:</strong> <t t-out="record.available_capacity.value"/> %
                                         </p>
                                         <p>
-                                            <strong>Health:</strong> <field name="health_status" widget="badge"/>
+                                            <strong>Health:</strong> <span class="badge" t-att-class="'badge-' + ('success' if record.health_status.value == 'healthy' else 'warning' if record.health_status.value == 'warning' else 'danger' if record.health_status.value == 'critical' else 'secondary')"><t t-out="record.health_status.value"/></span>
                                         </p>
-                                        <p class="text-muted" t-if="record.last_check_date.raw_value">
-                                            Last check: <field name="last_check_date"/>
+                                        <p class="text-muted" t-if="record.last_check_date.value">
+                                            Last check: <t t-out="record.last_check_date.value"/>
                                         </p>
                                     </div>
                                 </div>
                                 <div class="oe_kanban_footer">
-                                    <button type="object" name="action_check_health" class="btn btn-sm btn-primary" title="Check Health">
-                                        <i class="fa fa-heartbeat"/> Check
+                                    <button type="object" name="action_check_health" class="btn btn-sm btn-primary">
+                                        Check Health
                                     </button>
-                                    <button type="object" name="action_view_instances" class="btn btn-sm btn-info" title="View Instances">
-                                        <i class="fa fa-list"/> Instances
+                                    <button type="object" name="action_view_instances" class="btn btn-sm btn-info">
+                                        Instances
                                     </button>
                                 </div>
                             </div>
@@ -85,9 +86,9 @@
             <field name="arch" type="xml">
                 <form string="SaaS Server">
                     <header>
-                        <button name="action_activate" type="object" class="oe_highlight" string="Activate" states="draft,offline"/>
-                        <button name="action_deactivate" type="object" string="Deactivate" states="active,maintenance"/>
-                        <button name="action_maintenance" type="object" string="Maintenance" states="active"/>
+                        <button name="action_activate" type="object" class="oe_highlight" string="Activate" invisible="state not in ('draft', 'offline')"/>
+                        <button name="action_deactivate" type="object" string="Deactivate" invisible="state not in ('active', 'maintenance')"/>
+                        <button name="action_maintenance" type="object" string="Maintenance" invisible="state != 'active'"/>
                         <button name="action_check_health" type="object" string="Check Health" class="btn-info"/>
                         <button name="action_test_connection" type="object" string="Test Connection"/>
                         <field name="state" widget="statusbar" options="{'clickable': False}"/>
@@ -99,44 +100,33 @@
                             </h1>
                         </div>
 
-                        <!-- Status Section -->
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <div class="oe_stat_button" t-if="widget.view.get('title') != 'New'">
-                                    <field name="is_online" widget="boolean" readonly="1"/>
-                                    <span>Online Status</span>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="oe_stat_button" t-if="widget.view.get('title') != 'New'">
-                                    <field name="health_status" widget="badge" readonly="1"/>
-                                    <span>Health Status</span>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="oe_stat_button" t-if="widget.view.get('title') != 'New'">
-                                    <field name="instance_count" readonly="1"/>
-                                    <span>Instances</span>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="oe_stat_button" t-if="widget.view.get('title') != 'New'">
-                                    <field name="available_capacity" widget="percentage" readonly="1"/>
-                                    <span>Capacity</span>
-                                </div>
-                            </div>
-                        </div>
-
                         <notebook>
                             <!-- Basic Information Tab -->
                             <page string="Basic Information" name="basic_info">
                                 <group>
-                                    <field name="code"/>
-                                    <field name="sequence"/>
-                                    <field name="active"/>
+                                    <group string="Identity">
+                                        <field name="code"/>
+                                        <field name="sequence"/>
+                                        <field name="active"/>
+                                    </group>
+                                    <group string="Description">
+                                        <field name="description"/>
+                                    </group>
                                 </group>
+                            </page>
+
+                            <!-- Status Tab -->
+                            <page string="Status" name="status">
                                 <group>
-                                    <field name="description"/>
+                                    <group string="Current Status">
+                                        <field name="is_online" readonly="1"/>
+                                        <field name="health_status" readonly="1"/>
+                                        <field name="last_check_date" readonly="1"/>
+                                    </group>
+                                    <group string="Capacity">
+                                        <field name="instance_count" readonly="1"/>
+                                        <field name="available_capacity" widget="percentage" readonly="1"/>
+                                    </group>
                                 </group>
                             </page>
 
@@ -147,11 +137,10 @@
                                         <field name="server_url" widget="url"/>
                                         <field name="server_ip"/>
                                         <field name="server_port"/>
+                                    </group>
+                                    <group string="SSH Credentials">
                                         <field name="server_username"/>
                                         <field name="server_password" password="True"/>
-                                    </group>
-                                    <group string="Last Check">
-                                        <field name="last_check_date" readonly="1"/>
                                     </group>
                                 </group>
                             </page>
@@ -159,13 +148,13 @@
                             <!-- Database Configuration Tab -->
                             <page string="Database Configuration" name="database_config">
                                 <group>
-                                    <group string="Database Connection">
+                                    <group string="PostgreSQL Connection">
                                         <field name="db_host"/>
                                         <field name="db_port"/>
                                         <field name="db_user"/>
                                         <field name="db_password" password="True"/>
                                     </group>
-                                    <group string="Authentication">
+                                    <group string="Odoo Authentication">
                                         <field name="master_password" password="True"/>
                                     </group>
                                 </group>
@@ -179,10 +168,9 @@
                                         <field name="memory_gb"/>
                                         <field name="disk_gb"/>
                                     </group>
-                                    <group string="Capacity">
+                                    <group string="Capacity Management">
                                         <field name="max_instances"/>
                                         <field name="instance_count" readonly="1"/>
-                                        <field name="available_capacity" widget="percentage" readonly="1"/>
                                     </group>
                                 </group>
                             </page>
@@ -190,13 +178,13 @@
                             <!-- Instances Tab -->
                             <page string="Hosted Instances" name="instances">
                                 <field name="instance_ids" nolabel="1">
-                                    <tree>
+                                    <list string="Instances">
                                         <field name="name"/>
                                         <field name="partner_id"/>
                                         <field name="database_name"/>
                                         <field name="state" widget="badge"/>
                                         <field name="activation_date"/>
-                                    </tree>
+                                    </list>
                                 </field>
                             </page>
                         </notebook>
@@ -223,8 +211,8 @@
                     <filter name="active_servers" string="Active" domain="[('state', '=', 'active')]"/>
                     <filter name="offline_servers" string="Offline" domain="[('state', '=', 'offline')]"/>
                     <filter name="maintenance_servers" string="Maintenance" domain="[('state', '=', 'maintenance')]"/>
-                    <filter name="online_servers" string="Online" domain="[('is_online', '=', True)]"/>
-                    <filter name="low_capacity" string="Low Capacity" domain="[('available_capacity', '&lt;', 20)]"/>
+                    <filter name="healthy_servers" string="Healthy" domain="[('health_status', '=', 'healthy')]"/>
+                    <filter name="critical_servers" string="Critical" domain="[('health_status', '=', 'critical')]"/>
                     <separator/>
                     <group expand="0" string="Group By">
                         <filter name="group_by_state" string="State" context="{'group_by': 'state'}"/>

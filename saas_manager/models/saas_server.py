@@ -11,6 +11,7 @@ Management of multi-tenant Odoo servers.
 import logging
 import requests
 from datetime import datetime
+from urllib.parse import urlparse, urlunparse
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 
@@ -169,10 +170,10 @@ class SaaSServer(models.Model):
         help="Number of instances currently hosted"
     )
     available_capacity = fields.Float(
-        string='Available Capacity %',
+        string="Capacité disponible (%)",
         compute='_compute_available_capacity',
-        readonly=True,
-        help="Percentage of available capacity"
+        store=True,  # Ajouter store=True
+        compute_sudo=True
     )
 
     # Relationships
@@ -247,7 +248,7 @@ class SaaSServer(models.Model):
         for server in self:
             server.instance_count = len(server.instance_ids)
 
-    @api.depends('instance_count', 'max_instances')
+    @api.depends('max_instances', 'instance_count')
     def _compute_available_capacity(self):
         """
         Calculer le pourcentage de capacité disponible.
@@ -267,48 +268,44 @@ class SaaSServer(models.Model):
 
         Returns:
             bool: True if connection successful
-
-        Raises:
-            UserError: If connection fails
         """
         self.ensure_one()
+        rpc_url = None
 
         try:
-            rpc_url = f"{self.server_url}/jsonrpc"
+            # Nettoyer l'URL de base (sans le chemin)
+            base_url = self.server_url.rstrip('/')
 
-            payload = {
-                'jsonrpc': '2.0',
-                'method': 'call',
-                'params': {
-                    'service': 'common',
-                    'method': 'version',
-                },
-                'id': 1
-            }
+            # Tester la connexion en accédant à un endpoint simple
+            # plutôt que de faire un appel RPC complexe
+            test_url = f"{base_url}/web/health"
 
-            _logger.info(f"Testing connection to server {self.name}: {rpc_url}")
+            _logger.info(f"Testing connection to server {self.name}: {test_url}")
 
-            response = requests.post(
-                rpc_url,
-                json=payload,
-                timeout=10
+            response = requests.get(
+                test_url,
+                timeout=10,
+                verify=False,
+                allow_redirects=True
             )
 
-            response.raise_for_status()
-            result = response.json()
-
-            if 'error' in result and result['error']:
-                _logger.warning(f"Server {self.name} returned error: {result['error']}")
+            # Si la réponse HTTP 200 ou 404 (page existe mais pas trouvée), le serveur répond
+            # Si c'est un 302 redirect, c'est aussi bon signe
+            if response.status_code in [200, 301, 302, 303, 307, 308, 404]:
+                _logger.info(f"Connection to server {self.name} successful. Status: {response.status_code}")
+                return True
+            else:
+                _logger.warning(f"Server {self.name} returned HTTP {response.status_code}. URL: {test_url}")
                 return False
 
-            _logger.info(f"Connection to server {self.name} successful")
-            return True
-
         except requests.exceptions.Timeout:
-            _logger.warning(f"Connection to server {self.name} timed out")
+            _logger.warning(f"Connection to server {self.name} timed out (10s). URL: {base_url}")
             return False
-        except requests.exceptions.ConnectionError:
-            _logger.warning(f"Could not connect to server {self.name}")
+        except requests.exceptions.ConnectionError as e:
+            _logger.warning(f"Could not connect to server {self.name}. URL: {base_url}. Error: {str(e)}")
+            return False
+        except requests.exceptions.RequestException as e:
+            _logger.warning(f"Request error connecting to server {self.name}: {str(e)}")
             return False
         except Exception as e:
             _logger.warning(f"Error testing connection to server {self.name}: {str(e)}")
@@ -484,14 +481,19 @@ class SaaSServer(models.Model):
         """
         self.ensure_one()
 
-        is_online = self._test_connection()
+        try:
+            is_online = self._test_connection()
 
-        if is_online:
-            message = _('Connection to server "%s" is successful!') % self.name
-            notification_type = 'success'
-        else:
-            message = _('Failed to connect to server "%s".\n\nPlease check the server URL.') % self.name
+            if is_online:
+                message = _('Connection to server "%s" is successful!') % self.name
+                notification_type = 'success'
+            else:
+                message = _('Failed to connect to server "%s".\n\nPlease check:\n- Server URL: %s\n- Server Port: %s\n- Server is running') % (self.name, self.server_url, self.server_port)
+                notification_type = 'danger'
+        except Exception as e:
+            message = _('Connection test error: %s') % str(e)
             notification_type = 'danger'
+            _logger.exception(f"Connection test error for server {self.name}")
 
         return {
             'type': 'ir.actions.client',

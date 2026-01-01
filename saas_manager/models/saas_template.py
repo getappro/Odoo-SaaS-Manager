@@ -11,8 +11,6 @@ PostgreSQL master database serving as a template for cloning.
 import logging
 import json
 import requests
-import psycopg2
-from psycopg2 import sql, OperationalError
 from odoo import api, fields, models, _, tools
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import config
@@ -434,10 +432,8 @@ class SaaSTemplate(models.Model):
 
     def clone_template_db(self, new_db_name):
         """
-        Cloner la base de données template PostgreSQL.
-        Clone the PostgreSQL template database.
-
-        Phase 2: Implement ultra-fast provisioning using PostgreSQL TEMPLATE clone
+        Cloner la base de données template via l'API RPC d'Odoo.
+        Clone the template database via Odoo's RPC API.
 
         Args:
             new_db_name (str): Name of the new database to create
@@ -456,73 +452,76 @@ class SaaSTemplate(models.Model):
             )
 
         try:
-            # Get PostgreSQL connection parameters from server
-            db_host = self.server_id.db_host
-            db_port = self.server_id.db_port
-            db_user = self.server_id.db_user
-            db_password = self.server_id.db_password
+            # Get server details
+            server = self.server_id
+            base_url = server.server_url.rstrip('/')
+            master_password = server.master_password
 
-            _logger.info(f"Cloning template {self.template_db} to {new_db_name} on server {self.server_id.name}")
+            _logger.info(f"Cloning template {self.template_db} to {new_db_name} on server {server.name}")
+            _logger.info(f"Using server URL: {base_url}")
 
-            # Connect to PostgreSQL
-            conn_params = {
-                'host': db_host,
-                'port': db_port,
-                'user': db_user,
-                'password': db_password,
-                'database': 'postgres',
+            # Endpoint for database operations
+            rpc_url = f"{base_url}/jsonrpc"
+
+            # Payload for duplicating the database
+            # This uses Odoo's built-in database duplication functionality
+            payload = {
+                'jsonrpc': '2.0',
+                'method': 'call',
+                'params': {
+                    'service': 'db',
+                    'method': 'duplicate_database',
+                    'args': [
+                        master_password,      # master password
+                        self.template_db,      # source database name
+                        new_db_name,           # new database name
+                    ]
+                },
+                'id': 1
             }
 
-            try:
-                conn = psycopg2.connect(**conn_params)
-                conn.autocommit = True
-                cursor = conn.cursor()
-            except OperationalError as e:
-                raise UserError(
-                    _("Could not connect to PostgreSQL server.\n\nError: %s") % str(e)
-                )
+            _logger.info(f"Duplicating database via RPC: {self.template_db} → {new_db_name}")
 
-            # Check if new database already exists
-            cursor.execute(
-                sql.SQL("SELECT 1 FROM pg_database WHERE datname = %s"),
-                [new_db_name]
+            # Make RPC call
+            response = requests.post(
+                rpc_url,
+                json=payload,
+                timeout=600  # Allow up to 10 minutes for database duplication
             )
 
-            if cursor.fetchone():
-                cursor.close()
-                conn.close()
+            response.raise_for_status()
+            result = response.json()
+
+            # Check for RPC errors
+            if 'error' in result and result['error']:
+                error_data = result['error'].get('data', {})
+                error_msg = error_data.get('message', str(result['error']))
+                _logger.warning(f"RPC Error: {error_msg}")
                 raise UserError(
-                    _("Database '%s' already exists!") % new_db_name
+                    _("Failed to duplicate database via RPC.\n\nError: %s") % error_msg
                 )
 
-            # Clone the template database
-            # This is ultra-fast because it just creates a copy of the template
-            try:
-                cursor.execute(
-                    sql.SQL("CREATE DATABASE {} TEMPLATE {} WITH OWNER {}").format(
-                        sql.Identifier(new_db_name),
-                        sql.Identifier(self.template_db),
-                        sql.Identifier(db_user)
-                    )
-                )
-                _logger.info(f"Database cloned successfully: {new_db_name}")
-            except Exception as e:
-                cursor.close()
-                conn.close()
-                raise UserError(
-                    _("Failed to clone database '%s'.\n\nError: %s") % (new_db_name, str(e))
-                )
-
-            cursor.close()
-            conn.close()
-
-            _logger.info(f"Template {self.template_db} cloned to {new_db_name}")
+            _logger.info(f"Database duplicated successfully: {new_db_name}")
             return True
 
+        except requests.exceptions.Timeout:
+            _logger.error(f"Database duplication timed out for {new_db_name}")
+            raise UserError(
+                _("Database duplication timed out.\n\n"
+                  "The template database might be too large.\n\n"
+                  "Please try again or contact support.")
+            )
+        except requests.exceptions.RequestException as e:
+            _logger.exception(f"Request error during database duplication")
+            raise UserError(
+                _("Failed to connect to Odoo RPC endpoint.\n\n"
+                  "URL: %s\n\n"
+                  "Error: %s") % (base_url, str(e))
+            )
         except UserError:
             raise
         except Exception as e:
-            _logger.exception("Unexpected error in clone_template_db")
+            _logger.exception(f"Unexpected error in clone_template_db")
             raise UserError(
                 _("An unexpected error occurred while cloning the template database.\n\nError: %s") % str(e)
             )
@@ -530,16 +529,57 @@ class SaaSTemplate(models.Model):
     def action_access_template_db(self):
         """
         Ouvrir l'URL pour accéder à la configuration du template.
-        Open URL to access template configuration.
-        
+        Open URL to access template database in new window.
+
+        Utilise le nom de la base PostgreSQL comme hostname.
+        Uses the PostgreSQL database name as hostname.
+
+        Exemple: template 'blank' → hostname 'blank.africasys.ma'
+        Example: template 'blank' → hostname 'blank.africasys.ma'
+
         Returns:
             dict: Action to open template database in new window
         """
         self.ensure_one()
         
+        from urllib.parse import urlparse, urlunparse
+
+        # Récupérer la configuration de base
         base_url = self.env['ir.config_parameter'].sudo().get_param('web.base.url')
-        template_url = f"{base_url}/web?db={self.template_db}"
-        
+        parsed_base = urlparse(base_url.rstrip('/'))
+
+        # Extraire le domaine principal (africasys.ma)
+        # À partir de dev.africasys.ma, on extrait africasys.ma
+        hostname_parts = parsed_base.hostname.split('.')
+
+        # Prendre les 2 dernières parties du domaine (ex: africasys.ma)
+        if len(hostname_parts) >= 2:
+            domain = '.'.join(hostname_parts[-2:])
+        else:
+            domain = parsed_base.hostname
+
+        # Construire le nouvel hostname avec le nom de la base
+        # Exemple: blank.africasys.ma
+        template_hostname = f"{self.template_db}.{domain}"
+
+        # Construire l'URL complète
+        # Si le port est spécifié dans l'URL de base, le conserver
+        if parsed_base.port:
+            netloc = f"{template_hostname}:{parsed_base.port}"
+        else:
+            netloc = template_hostname
+
+        template_url = urlunparse((
+            parsed_base.scheme,
+            netloc,
+            '/web',
+            '',
+            '',
+            ''
+        ))
+
+        _logger.info(f"Opening template database {self.template_db} at URL: {template_url}")
+
         return {
             'type': 'ir.actions.act_url',
             'url': template_url,
