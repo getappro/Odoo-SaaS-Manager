@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- JWT Secret Key Configuration -->
+    <record id="saas_access_control_jwt_secret" model="ir.config_parameter">
+        <field name="key">saas_access_control.jwt_secret_key</field>
+        <field name="value">change-this-secret-in-production</field>
+    </record>
+
+    <!-- Support Session Default Duration (hours) -->
+    <record id="saas_access_control_session_duration" model="ir.config_parameter">
+        <field name="key">saas_access_control.session_duration_hours</field>
+        <field name="value">24</field>
+    </record>
+
+    <!-- Log Retention Period (days) -->
+    <record id="saas_access_control_log_retention" model="ir.config_parameter">
+        <field name="key">saas_access_control.log_retention_days</field>
+        <field name="value">90</field>
+    </record>
+
+    <!-- Enable Access Middleware -->
+    <record id="saas_access_control_enable_middleware" model="ir.config_parameter">
+        <field name="key">saas_access_control.enable_middleware</field>
+        <field name="value">True</field>
+    </record>
+</odoo>
+

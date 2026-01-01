@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Suspension Views -->
+    <record id="view_saas_suspension_tree" model="ir.ui.view">
+        <field name="name">saas.suspension.list</field>
+        <field name="model">saas.suspension</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="instance_id"/>
+                <field name="reason"/>
+                <field name="suspended_date"/>
+                <field name="state" widget="badge"/>
+                <field name="created_by_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_saas_suspension_form" model="ir.ui.view">
+        <field name="name">saas.suspension.form</field>
+        <field name="model">saas.suspension</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_resume" type="object" string="Resume Instance"
+                            invisible="state != 'active'" class="oe_highlight"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <field name="instance_id"/>
+                        <field name="reason"/>
+                        <field name="description"/>
+                        <field name="suspended_date"/>
+                        <field name="resumed_date"/>
+                        <field name="created_by_id"/>
+                        <field name="resumed_by_id"/>
+                    </group>
+                    <group string="Internal Notes">
+                        <field name="notes" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_saas_suspension_search" model="ir.ui.view">
+        <field name="name">saas.suspension.search</field>
+        <field name="model">saas.suspension</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="instance_id"/>
+                <field name="reason"/>
+                <field name="state"/>
+                <filter name="active_suspensions" string="Active" domain="[('state', '=', 'active')]"/>
+                <filter name="resolved_suspensions" string="Resolved" domain="[('state', '=', 'resolved')]"/>
+                <separator/>
+                <filter name="expired" string="Expired" domain="[('reason', '=', 'expired')]"/>
+                <filter name="payment" string="Payment Failed" domain="[('reason', '=', 'payment')]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Support Session Views -->
+    <record id="view_support_session_tree" model="ir.ui.view">
+        <field name="name">support.session.list</field>
+        <field name="model">support.session</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="instance_id"/>
+                <field name="support_user_id"/>
+                <field name="reason"/>
+                <field name="created_date"/>
+                <field name="expires_at"/>
+                <field name="state" widget="badge"/>
+                <field name="access_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_support_session_form" model="ir.ui.view">
+        <field name="name">support.session.form</field>
+        <field name="model">support.session</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_revoke" type="object" string="Revoke Access"
+                            invisible="is_revoked" class="oe_highlight"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="instance_id"/>
+                            <field name="support_user_id"/>
+                            <field name="reason"/>
+                            <field name="allowed_actions"/>
+                        </group>
+                        <group>
+                            <field name="created_date"/>
+                            <field name="expires_at"/>
+                            <field name="accessed_at"/>
+                            <field name="access_count"/>
+                        </group>
+                    </group>
+                    <group string="Access Control">
+                        <field name="allowed_ip" help="Leave empty for any IP"/>
+                        <field name="is_revoked"/>
+                        <field name="revoked_by_id"/>
+                        <field name="revoked_date"/>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <group string="JWT Token" groups="saas_access_control.group_saas_admin">
+                        <field name="jwt_token" nolabel="1" readonly="1" widget="CopyClipboardText"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_support_session_search" model="ir.ui.view">
+        <field name="name">support.session.search</field>
+        <field name="model">support.session</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="instance_id"/>
+                <field name="support_user_id"/>
+                <field name="reason"/>
+                <field name="state"/>
+                <filter name="active_sessions" string="Active" domain="[('state', '=', 'active')]"/>
+                <filter name="expired_sessions" string="Expired" domain="[('state', '=', 'expired')]"/>
+                <filter name="revoked_sessions" string="Revoked" domain="[('is_revoked', '=', True)]"/>
+                <separator/>
+                <filter name="troubleshooting" string="Troubleshooting" domain="[('reason', '=', 'troubleshooting')]"/>
+                <filter name="emergency" string="Emergency" domain="[('reason', '=', 'emergency')]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Access Log Views -->
+    <record id="view_access_log_tree" model="ir.ui.view">
+        <field name="name">access.log.list</field>
+        <field name="model">access.log</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="timestamp"/>
+                <field name="instance_id"/>
+                <field name="user_id"/>
+                <field name="action"/>
+                <field name="ip_address"/>
+                <field name="status" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_access_log_form" model="ir.ui.view">
+        <field name="name">access.log.form</field>
+        <field name="model">access.log</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="timestamp"/>
+                            <field name="instance_id"/>
+                            <field name="user_id"/>
+                        </group>
+                        <group>
+                            <field name="action"/>
+                            <field name="status"/>
+                            <field name="ip_address"/>
+                        </group>
+                    </group>
+                    <group string="Details">
+                        <field name="description" nolabel="1"/>
+                        <field name="error_message" nolabel="1"/>
+                    </group>
+                    <group string="Technical Info" groups="saas_access_control.group_saas_admin">
+                        <field name="model_name"/>
+                        <field name="record_id"/>
+                        <field name="duration_ms"/>
+                        <field name="user_agent"/>
+                        <field name="details"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_access_log_search" model="ir.ui.view">
+        <field name="name">access.log.search</field>
+        <field name="model">access.log</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="instance_id"/>
+                <field name="user_id"/>
+                <field name="action"/>
+                <field name="timestamp"/>
+                <filter name="today" string="Today" domain="[('timestamp', '>=', context_today().strftime('%Y-%m-%d')), ('timestamp', '&lt;', (context_today() + relativedelta(days=1)).strftime('%Y-%m-%d'))]"/>
+                <filter name="this_month" string="This Month" domain="[('timestamp', '>=', context_today().strftime('%Y-%m-01')), ('timestamp', '&lt;', (context_today() + relativedelta(months=1)).strftime('%Y-%m-01'))]"/>
+                <separator/>
+                <filter name="success" string="Success" domain="[('status', '=', 'success')]"/>
+                <filter name="failed" string="Failed" domain="[('status', '!=', 'success')]"/>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action Menu Items -->
+    <menuitem id="menu_saas_access_control" name="Access Control" parent="saas_manager.menu_saas_root"
+              sequence="20" groups="saas_access_control.group_saas_admin"/>
+
+    <menuitem id="menu_suspensions" name="Suspensions" parent="menu_saas_access_control"
+              action="action_view_saas_suspension" sequence="10"/>
+
+    <menuitem id="menu_support_sessions" name="Support Sessions" parent="menu_saas_access_control"
+              action="action_view_support_session" sequence="20"/>
+
+    <menuitem id="menu_access_logs" name="Access Logs" parent="menu_saas_access_control"
+              action="action_view_access_log" sequence="30"/>
+
+    <!-- Actions -->
+    <record id="action_view_saas_suspension" model="ir.actions.act_window">
+        <field name="name">Suspensions</field>
+        <field name="res_model">saas.suspension</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">Manage instance suspensions</field>
+    </record>
+
+    <record id="action_view_support_session" model="ir.actions.act_window">
+        <field name="name">Support Sessions</field>
+        <field name="res_model">support.session</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">Manage support access sessions</field>
+    </record>
+
+    <record id="action_view_access_log" model="ir.actions.act_window">
+        <field name="name">Access Logs</field>
+        <field name="res_model">access.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">View access audit logs</field>
+    </record>
+</odoo>
+

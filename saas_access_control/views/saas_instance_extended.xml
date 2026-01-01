@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Extend saas.instance view with access control buttons -->
+    <record id="view_saas_instance_form_extended" model="ir.ui.view">
+        <field name="name">saas.instance.form.extended</field>
+        <field name="model">saas.instance</field>
+        <field name="inherit_id" ref="saas_manager.view_saas_instance_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_access_instance']" position="after">
+                <button name="action_suspend_instance" type="object" string="Suspend"
+                        invisible="is_suspended" class="oe_link" groups="saas_access_control.group_saas_admin"/>
+                <button name="action_create_support_session" type="object" string="Create Support Session"
+                        class="oe_link" groups="saas_access_control.group_saas_support"/>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="after">
+                <field name="is_suspended" invisible="1"/>
+                <field name="suspension_reason" readonly="1"
+                       invisible="not is_suspended"
+                       widget="badge" class="bg-danger"/>
+            </xpath>
+            <xpath expr="//div[@class='oe_button_box']" position="inside">
+                <button name="action_view_suspension_history" type="object" class="oe_stat_button" icon="fa-ban"
+                        groups="saas_access_control.group_saas_admin">
+                    <field name="id" string="Suspensions" widget="statinfo"/>
+                </button>
+                <button name="action_view_access_logs" type="object" class="oe_stat_button" icon="fa-history"
+                        groups="saas_access_control.group_saas_admin">
+                    <field name="id" string="Access Logs" widget="statinfo"/>
+                </button>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
