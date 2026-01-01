@@ -37,6 +37,7 @@
                             <group>
                                 <field name="code"/>
                                 <field name="template_db"/>
+                                <field name="server_id" options="{'no_create': False}"/>
                                 <field name="is_template_ready" widget="boolean_toggle"/>
                             </group>
                             <group>

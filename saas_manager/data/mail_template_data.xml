@@ -1,33 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="1">
-        
         <!-- Email Template: Instance Provisioned -->
         <record id="mail_template_instance_provisioned" model="mail.template">
             <field name="name">SaaS: Instance Provisioned</field>
             <field name="model_id" ref="model_saas_instance"/>
             <field name="subject">Your SaaS Instance is Ready - {{ object.name }}</field>
-            <field name="email_from">{{ (object.company_id.email_formatted or user.email_formatted) }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
-            <field name="body_html" type="html">
+            <field name="body_html"><![CDATA[
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
     <h2 style="color: #714B67;">Your SaaS Instance is Ready!</h2>
-    <p>Dear {{ object.partner_id.name }},</p>
+    <p>Dear <t t-out="object.partner_id.name or 'Customer'">Customer</t>,</p>
     <p>Your Odoo instance has been successfully provisioned and is now ready to use.</p>
     
     <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 5px;">
         <h3 style="margin-top: 0;">Instance Details:</h3>
         <ul style="list-style: none; padding: 0;">
-            <li><strong>Instance Name:</strong> {{ object.name }}</li>
-            <li><strong>URL:</strong> <a href="https://{{ object.domain }}">https://{{ object.domain }}</a></li>
-            <li><strong>Admin Login:</strong> {{ object.admin_login }}</li>
-            <li><strong>Admin Password:</strong> {{ object.admin_password }}</li>
-            <li><strong>Plan:</strong> {{ object.plan_id.name }}</li>
+            <li><strong>Instance Name:</strong> <t t-out="object.name or ''">Instance</t></li>
+            <li><strong>URL:</strong> <a href="https://<t t-out="object.domain or ''">example.com</t>">https://<t t-out="object.domain or ''">example.com</t></a></li>
+            <li><strong>Admin Login:</strong> <t t-out="object.admin_login or ''">admin</t></li>
+            <li><strong>Admin Password:</strong> <t t-out="object.admin_password or ''">password</t></li>
+            <li><strong>Plan:</strong> <t t-out="object.plan_id.name or ''">Plan</t></li>
         </ul>
     </div>
     
     <p>
-        <a href="https://{{ object.domain }}" style="background-color: #714B67; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+        <a href="https://<t t-out="object.domain or ''">example.com</t>" style="background-color: #714B67; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
             Access Your Instance
         </a>
     </p>
@@ -36,7 +35,7 @@
         If you have any questions, please don't hesitate to contact our support team.
     </p>
 </div>
-            </field>
+            ]]></field>
         </record>
 
         <!-- Email Template: Subscription Expiring -->
@@ -44,20 +43,20 @@
             <field name="name">SaaS: Subscription Expiring</field>
             <field name="model_id" ref="model_saas_subscription"/>
             <field name="subject">Your SaaS Subscription is Expiring Soon - {{ object.instance_id.name }}</field>
-            <field name="email_from">{{ (object.company_id.email_formatted or user.email_formatted) }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
-            <field name="body_html" type="html">
+            <field name="body_html"><![CDATA[
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
     <h2 style="color: #d9534f;">Subscription Expiring Soon</h2>
-    <p>Dear {{ object.partner_id.name }},</p>
+    <p>Dear <t t-out="object.partner_id.name or 'Customer'">Customer</t>,</p>
     <p>Your SaaS subscription is expiring soon.</p>
     
     <div style="background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #ffc107;">
         <h3 style="margin-top: 0;">Subscription Details:</h3>
         <ul style="list-style: none; padding: 0;">
-            <li><strong>Instance:</strong> {{ object.instance_id.name }}</li>
-            <li><strong>Plan:</strong> {{ object.plan_id.name }}</li>
-            <li><strong>Expiration Date:</strong> {{ object.end_date }}</li>
+            <li><strong>Instance:</strong> <t t-out="object.instance_id.name or ''">Instance</t></li>
+            <li><strong>Plan:</strong> <t t-out="object.plan_id.name or ''">Plan</t></li>
+            <li><strong>Expiration Date:</strong> <t t-out="object.end_date or ''">Date</t></li>
         </ul>
     </div>
     
@@ -67,7 +66,7 @@
         If auto-renewal is enabled, your subscription will be automatically renewed.
     </p>
 </div>
-            </field>
+            ]]></field>
         </record>
 
         <!-- Email Template: Instance Suspended -->
@@ -75,19 +74,19 @@
             <field name="name">SaaS: Instance Suspended</field>
             <field name="model_id" ref="model_saas_instance"/>
             <field name="subject">Your SaaS Instance Has Been Suspended - {{ object.name }}</field>
-            <field name="email_from">{{ (object.company_id.email_formatted or user.email_formatted) }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
-            <field name="body_html" type="html">
+            <field name="body_html"><![CDATA[
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
     <h2 style="color: #d9534f;">Instance Suspended</h2>
-    <p>Dear {{ object.partner_id.name }},</p>
+    <p>Dear <t t-out="object.partner_id.name or 'Customer'">Customer</t>,</p>
     <p>Your SaaS instance has been suspended due to subscription expiration.</p>
     
     <div style="background-color: #f8d7da; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #d9534f;">
         <h3 style="margin-top: 0;">Instance Details:</h3>
         <ul style="list-style: none; padding: 0;">
-            <li><strong>Instance Name:</strong> {{ object.name }}</li>
-            <li><strong>URL:</strong> {{ object.domain }}</li>
+            <li><strong>Instance Name:</strong> <t t-out="object.name or ''">Instance</t></li>
+            <li><strong>URL:</strong> <t t-out="object.domain or ''">example.com</t></li>
         </ul>
     </div>
     
@@ -97,8 +96,79 @@
         Contact our support team if you have any questions.
     </p>
 </div>
-            </field>
+            ]]></field>
+        </record>
+
+        <!-- Email Template: Instance Reactivated -->
+        <record id="mail_template_instance_reactivated" model="mail.template">
+            <field name="name">SaaS: Instance Reactivated</field>
+            <field name="model_id" ref="model_saas_instance"/>
+            <field name="subject">Your SaaS Instance Has Been Reactivated - {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="body_html"><![CDATA[
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #5cb85c;">Instance Reactivated</h2>
+    <p>Dear <t t-out="object.partner_id.name or 'Customer'">Customer</t>,</p>
+    <p>Your SaaS instance has been successfully reactivated and is now back online.</p>
+
+    <div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #5cb85c;">
+        <h3 style="margin-top: 0;">Instance Details:</h3>
+        <ul style="list-style: none; padding: 0;">
+            <li><strong>Instance Name:</strong> <t t-out="object.name or ''">Instance</t></li>
+            <li><strong>URL:</strong> <a href="https://<t t-out="object.domain or ''">example.com</t>">https://<t t-out="object.domain or ''">example.com</t></a></li>
+            <li><strong>Status:</strong> Active</li>
+            <li><strong>Reactivation Date:</strong> <t t-out="object.write_date or ''">Date</t></li>
+        </ul>
+    </div>
+
+    <p>
+        <a href="https://<t t-out="object.domain or ''">example.com</t>" style="background-color: #5cb85c; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Access Your Instance
+        </a>
+    </p>
+
+    <p style="color: #888; font-size: 12px; margin-top: 30px;">
+        If you have any questions, please don't hesitate to contact our support team.
+    </p>
+</div>
+            ]]></field>
+        </record>
+
+        <!-- Email Template: Instance Terminated -->
+        <record id="mail_template_instance_terminated" model="mail.template">
+            <field name="name">SaaS: Instance Terminated</field>
+            <field name="model_id" ref="model_saas_instance"/>
+            <field name="subject">Your SaaS Instance Has Been Terminated - {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="body_html"><![CDATA[
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <h2 style="color: #d9534f;">Instance Terminated</h2>
+    <p>Dear <t t-out="object.partner_id.name or 'Customer'">Customer</t>,</p>
+    <p>Your SaaS instance has been terminated and the database has been permanently deleted.</p>
+
+    <div style="background-color: #f8d7da; padding: 20px; margin: 20px 0; border-radius: 5px; border-left: 4px solid #d9534f;">
+        <h3 style="margin-top: 0;">Instance Information:</h3>
+        <ul style="list-style: none; padding: 0;">
+            <li><strong>Instance Name:</strong> <t t-out="object.name or ''">Instance</t></li>
+            <li><strong>Database Name:</strong> <t t-out="object.database_name or ''">Database</t></li>
+            <li><strong>Termination Date:</strong> <t t-out="object.write_date or ''">Date</t></li>
+        </ul>
+    </div>
+
+    <p style="color: #888;">
+        All data associated with this instance has been permanently deleted. If this was done in error, please contact our support team immediately.
+    </p>
+
+    <p style="color: #888; font-size: 12px; margin-top: 30px;">
+        Contact our support team if you have any questions.
+    </p>
+</div>
+            ]]></field>
         </record>
 
     </data>
 </odoo>
+
+

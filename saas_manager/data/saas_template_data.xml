@@ -7,6 +7,7 @@
             <field name="name">Blank Template</field>
             <field name="code">blank</field>
             <field name="template_db">template_blank</field>
+            <field name="server_id" ref="saas_server_default"/>
             <field name="is_template_ready" eval="False"/>
             <field name="template_version">1.0.0</field>
             <field name="description"><![CDATA[
@@ -25,6 +26,7 @@
             <field name="name">Restaurant Template</field>
             <field name="code">restaurant</field>
             <field name="template_db">template_restaurant</field>
+            <field name="server_id" ref="saas_server_default"/>
             <field name="is_template_ready" eval="False"/>
             <field name="template_version">1.0.0</field>
             <field name="description"><![CDATA[
@@ -45,6 +47,7 @@
             <field name="name">E-commerce Template</field>
             <field name="code">ecommerce</field>
             <field name="template_db">template_ecommerce</field>
+            <field name="server_id" ref="saas_server_default"/>
             <field name="is_template_ready" eval="False"/>
             <field name="template_version">1.0.0</field>
             <field name="description"><![CDATA[
@@ -66,6 +69,7 @@
             <field name="name">Services Template</field>
             <field name="code">services</field>
             <field name="template_db">template_services</field>
+            <field name="server_id" ref="saas_server_default"/>
             <field name="is_template_ready" eval="False"/>
             <field name="template_version">1.0.0</field>
             <field name="description"><![CDATA[

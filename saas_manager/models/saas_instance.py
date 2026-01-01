@@ -11,6 +11,7 @@ Client instance with automated provisioning.
 import logging
 import secrets
 import string
+import requests
 from datetime import datetime, timedelta
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
@@ -45,6 +46,7 @@ class SaaSInstance(models.Model):
         required=True,
         tracking=True,
         ondelete='restrict',
+        default=lambda self: self.env.user.partner_id,
         help="Customer owning this instance"
     )
     database_name = fields.Char(
@@ -65,6 +67,11 @@ class SaaSInstance(models.Model):
         store=True,
         help="Full domain (e.g., 'client1.example.com')"
     )
+    protocol = fields.Selection([
+        ('http', 'HTTP'),
+        ('https', 'HTTPS'),
+    ], string='Protocol', default='https', required=True,
+        help="Protocol to use when accessing the instance (HTTP for development, HTTPS for production)")
     template_id = fields.Many2one(
         'saas.template',
         string='Template',
@@ -87,6 +94,8 @@ class SaaSInstance(models.Model):
         required=True,
         tracking=True,
         ondelete='restrict',
+        domain="[('state', '=', 'active'), ('available_capacity', '>', 0)]",
+        default=lambda self: self._get_default_server(),
         help="Server hosting this instance"
     )
     state = fields.Selection([
@@ -170,6 +179,18 @@ class SaaSInstance(models.Model):
             else:
                 instance.domain = False
 
+    def _get_default_server(self):
+        """
+        Obtenir le serveur par défaut avec le plus de capacité disponible.
+        Get default server with most available capacity.
+        """
+        Server = self.env['saas.server']
+        try:
+            return Server.get_available_server(min_capacity_percent=10)
+        except UserError:
+            # If no server with 10% capacity, try to get any active server
+            return Server.search([('state', '=', 'active')], limit=1)
+
     def _compute_current_users(self):
         """
         Calcule le nombre d'utilisateurs actifs.
@@ -248,6 +269,22 @@ class SaaSInstance(models.Model):
         if not self.template_id.is_template_ready:
             raise UserError(_('Template %s is not ready for cloning.') % self.template_id.name)
         
+        # Validate server state
+        if self.server_id.state != 'active':
+            raise UserError(
+                _("Cannot provision instance on server '%s'.\n\n"
+                  "Server state is '%s'. Server must be 'active' to provision instances.\n\n"
+                  "Please activate the server or select a different server.") % (self.server_id.name, self.server_id.state)
+            )
+        
+        # Validate server capacity
+        if self.server_id.available_capacity < 10:
+            raise UserError(
+                _("Cannot provision instance on server '%s'.\n\n"
+                  "Server has only %.1f%% capacity available. Minimum 10%% required.\n\n"
+                  "Please select a different server or increase max instances on this server.") % (self.server_id.name, self.server_id.available_capacity)
+            )
+        
         try:
             # Update state to provisioning
             self.write({'state': 'provisioning'})
@@ -278,6 +315,9 @@ class SaaSInstance(models.Model):
             
             _logger.info(f"Instance {self.name} provisioned successfully")
             
+            # Step 7: Send provisioning email to customer
+            self._send_provisioning_email()
+
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -325,8 +365,22 @@ class SaaSInstance(models.Model):
             
             _logger.info(f"Database {target_db} cloned from {template_db}")
         """
-        _logger.info(f"TODO Phase 2: Clone {self.template_id.template_db} to {self.database_name}")
-        # Placeholder - actual implementation in Phase 2
+        # Validate that template and instance are on the same server
+        if self.template_id.server_id != self.server_id:
+            raise UserError(
+                _("Template and instance must be on the same server.\n\n"
+                  "Template '%s' is on server '%s'\n"
+                  "Instance '%s' is on server '%s'\n\n"
+                  "Please select a template on the same server or change the instance server.") % (
+                      self.template_id.name, self.template_id.server_id.name,
+                      self.name, self.server_id.name
+                  )
+            )
+        
+        _logger.info(f"Cloning template {self.template_id.template_db} to {self.database_name} on server {self.server_id.name}")
+        
+        # Call template's clone method which uses server's DB configuration
+        self.template_id.clone_template_db(self.database_name)
 
     def _neutralize_database(self):
         """
@@ -417,46 +471,97 @@ class SaaSInstance(models.Model):
     def _create_client_admin(self):
         """
         Créer le compte administrateur client.
-        Create client administrator account.
-        
-        TODO Phase 2: Implement with odoorpc
-        
-        Example implementation:
-            import odoorpc
-            
-            odoo = odoorpc.ODOO(host, port, protocol='jsonrpc+ssl')
-            odoo.login(self.database_name, 'admin', 'admin')
-            
-            User = odoo.env['res.users']
-            
-            # Generate credentials
-            admin_login = self.admin_login or self.partner_id.email
+        Create client administrator account via RPC.
+
+        Modifie l'utilisateur admin (ID 2) de la base clonée avec les identifiants fournis.
+        Modifies the admin user (ID 2) of the cloned database with provided credentials.
+        """
+        self.ensure_one()
+
+        try:
+            # Generate credentials if not provided
+            admin_login = self.admin_login or self.partner_id.email or f"admin@{self.subdomain}"
             admin_password = self.admin_password or self._generate_random_password()
             
-            # Update admin user
-            admin_user = User.browse(2)
-            User.write([admin_user], {
-                'name': self.partner_id.name,
-                'login': admin_login,
-                'password': admin_password,
-                'email': self.partner_id.email,
-            })
-            
-            # Store credentials
+            # Get server details
+            server = self.server_id
+            base_url = server.server_url.rstrip('/')
+            rpc_url = f"{base_url}/jsonrpc"
+            master_password = server.master_password
+
+            _logger.info(f"Creating admin account for instance {self.database_name}")
+            _logger.info(f"Admin login: {admin_login}")
+
+            # First, use admin/admin to update the admin user
+            # We'll call execute_kw to update res.users with ID 2
+            payload = {
+                'jsonrpc': '2.0',
+                'method': 'call',
+                'params': {
+                    'service': 'object',
+                    'method': 'execute_kw',
+                    'args': [
+                        self.database_name,      # database name
+                        2,                        # admin user ID
+                        'admin',                  # current admin password
+                        'res.users',             # model
+                        'write',                 # method
+                        [[2], {                  # write args: [IDs], {values}
+                            'name': self.partner_id.name,
+                            'login': admin_login,
+                            'password': admin_password,
+                            'email': self.partner_id.email or admin_login,
+                        }]
+                    ]
+                },
+                'id': 1
+            }
+
+            _logger.info(f"Updating admin user via RPC: {rpc_url}")
+
+            response = requests.post(
+                rpc_url,
+                json=payload,
+                timeout=30,
+                verify=False
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            # Check for RPC errors
+            if 'error' in result and result['error']:
+                error_data = result['error'].get('data', {})
+                error_msg = error_data.get('message', str(result['error']))
+                _logger.error(f"Failed to update admin user: {error_msg}")
+                # Don't raise error, just log warning and continue
+                _logger.warning(f"Admin user configuration may not be complete: {error_msg}")
+            else:
+                _logger.info(f"Admin user updated successfully for {self.database_name}")
+
+            # Store the credentials
             self.write({
                 'admin_login': admin_login,
-                'admin_password': admin_password,  # Should be encrypted in production
+                'admin_password': admin_password,
             })
             
-            _logger.info(f"Admin user created for {self.database_name}")
-        """
-        _logger.info(f"TODO Phase 2: Create admin for {self.database_name}")
-        
-        # Generate credentials now for later use
-        if not self.admin_login:
-            self.admin_login = self.partner_id.email or f"admin@{self.subdomain}"
-        if not self.admin_password:
-            self.admin_password = self._generate_random_password()
+            _logger.info(f"Admin credentials stored for instance {self.database_name}")
+
+        except requests.exceptions.RequestException as e:
+            _logger.error(f"Request error while creating admin: {str(e)}")
+            # Generate and store credentials anyway for manual setup if needed
+            if not self.admin_login:
+                self.admin_login = self.partner_id.email or f"admin@{self.subdomain}"
+            if not self.admin_password:
+                self.admin_password = self._generate_random_password()
+            _logger.warning(f"Admin credentials stored but may need manual configuration")
+        except Exception as e:
+            _logger.exception(f"Error creating admin account: {str(e)}")
+            # Generate and store credentials anyway
+            if not self.admin_login:
+                self.admin_login = self.partner_id.email or f"admin@{self.subdomain}"
+            if not self.admin_password:
+                self.admin_password = self._generate_random_password()
 
     def _configure_subdomain(self):
         """
@@ -502,6 +607,242 @@ class SaaSInstance(models.Model):
         _logger.info(f"TODO Phase 2: Configure DNS for {self.domain}")
         # Placeholder - actual implementation in Phase 2
 
+    def _send_provisioning_email(self):
+        """
+        Envoyer un email au client avec les détails de connexion à l'instance.
+        Send provisioning details email to customer with connection information.
+
+        Utilise le modèle de mail 'mail_template_instance_provisioned' pour
+        envoyer un email professionnel avec les détails de l'instance.
+
+        Uses the 'mail_template_instance_provisioned' email template to send
+        a professional email with instance connection details.
+        """
+        self.ensure_one()
+
+        try:
+            # Get the email template for instance provisioning
+            template = self.env.ref(
+                'saas_manager.mail_template_instance_provisioned',
+                raise_if_not_found=False
+            )
+
+            if not template:
+                _logger.warning(
+                    f"Email template 'saas_manager.mail_template_instance_provisioned' "
+                    f"not found. Skipping email notification for instance {self.name}"
+                )
+                return False
+
+            # Check if partner has email
+            if not self.partner_id.email:
+                _logger.warning(
+                    f"Customer {self.partner_id.name} has no email address. "
+                    f"Cannot send provisioning email for instance {self.name}"
+                )
+                return False
+
+            _logger.info(
+                f"Sending provisioning email to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            # Send the email using the template
+            template.send_mail(
+                self.id,
+                force_send=True,
+                raise_exception=False
+            )
+
+            _logger.info(
+                f"Provisioning email sent successfully to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            return True
+
+        except Exception as e:
+            _logger.error(
+                f"Failed to send provisioning email for instance {self.name}: {str(e)}",
+                exc_info=True
+            )
+            # Don't raise error - provisioning is complete, email is just notification
+            return False
+
+    def _send_suspension_email(self):
+        """
+        Envoyer un email au client lors de la suspension de l'instance.
+        Send suspension notification email to customer.
+
+        Uses the 'mail_template_instance_suspended' email template.
+        """
+        self.ensure_one()
+
+        try:
+            # Get the email template for instance suspension
+            template = self.env.ref(
+                'saas_manager.mail_template_instance_suspended',
+                raise_if_not_found=False
+            )
+
+            if not template:
+                _logger.warning(
+                    f"Email template 'saas_manager.mail_template_instance_suspended' "
+                    f"not found. Skipping email notification for instance {self.name}"
+                )
+                return False
+
+            # Check if partner has email
+            if not self.partner_id.email:
+                _logger.warning(
+                    f"Customer {self.partner_id.name} has no email address. "
+                    f"Cannot send suspension email for instance {self.name}"
+                )
+                return False
+
+            _logger.info(
+                f"Sending suspension email to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            # Send the email using the template
+            template.send_mail(
+                self.id,
+                force_send=True,
+                raise_exception=False
+            )
+
+            _logger.info(
+                f"Suspension email sent successfully to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            return True
+
+        except Exception as e:
+            _logger.error(
+                f"Failed to send suspension email for instance {self.name}: {str(e)}",
+                exc_info=True
+            )
+            # Don't raise error - suspension is complete, email is just notification
+            return False
+
+    def _send_reactivation_email(self):
+        """
+        Envoyer un email au client lors de la réactivation de l'instance.
+        Send reactivation notification email to customer.
+
+        Uses the 'mail_template_instance_reactivated' email template.
+        """
+        self.ensure_one()
+
+        try:
+            # Get the email template for instance reactivation
+            template = self.env.ref(
+                'saas_manager.mail_template_instance_reactivated',
+                raise_if_not_found=False
+            )
+
+            if not template:
+                _logger.warning(
+                    f"Email template 'saas_manager.mail_template_instance_reactivated' "
+                    f"not found. Skipping email notification for instance {self.name}"
+                )
+                return False
+
+            # Check if partner has email
+            if not self.partner_id.email:
+                _logger.warning(
+                    f"Customer {self.partner_id.name} has no email address. "
+                    f"Cannot send reactivation email for instance {self.name}"
+                )
+                return False
+
+            _logger.info(
+                f"Sending reactivation email to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            # Send the email using the template
+            template.send_mail(
+                self.id,
+                force_send=True,
+                raise_exception=False
+            )
+
+            _logger.info(
+                f"Reactivation email sent successfully to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            return True
+
+        except Exception as e:
+            _logger.error(
+                f"Failed to send reactivation email for instance {self.name}: {str(e)}",
+                exc_info=True
+            )
+            # Don't raise error - reactivation is complete, email is just notification
+            return False
+
+    def _send_termination_email(self):
+        """
+        Envoyer un email au client lors de la suppression de l'instance.
+        Send termination notification email to customer.
+
+        Uses the 'mail_template_instance_terminated' email template.
+        """
+        self.ensure_one()
+
+        try:
+            # Get the email template for instance termination
+            template = self.env.ref(
+                'saas_manager.mail_template_instance_terminated',
+                raise_if_not_found=False
+            )
+
+            if not template:
+                _logger.warning(
+                    f"Email template 'saas_manager.mail_template_instance_terminated' "
+                    f"not found. Skipping email notification for instance {self.name}"
+                )
+                return False
+
+            # Check if partner has email
+            if not self.partner_id.email:
+                _logger.warning(
+                    f"Customer {self.partner_id.name} has no email address. "
+                    f"Cannot send termination email for instance {self.name}"
+                )
+                return False
+
+            _logger.info(
+                f"Sending termination email to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            # Send the email using the template
+            template.send_mail(
+                self.id,
+                force_send=True,
+                raise_exception=False
+            )
+
+            _logger.info(
+                f"Termination email sent successfully to {self.partner_id.email} "
+                f"for instance {self.name}"
+            )
+
+            return True
+
+        except Exception as e:
+            _logger.error(
+                f"Failed to send termination email for instance {self.name}: {str(e)}",
+                exc_info=True
+            )
+            # Don't raise error - termination is complete, email is just notification
+            return False
+
     def action_suspend(self):
         """
         Suspendre l'instance (non-paiement, expiration).
@@ -514,6 +855,9 @@ class SaaSInstance(models.Model):
         
         self.write({'state': 'suspended'})
         
+        # Send suspension email to customer
+        self._send_suspension_email()
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -537,6 +881,9 @@ class SaaSInstance(models.Model):
         
         self.write({'state': 'active'})
         
+        # Send reactivation email to customer
+        self._send_reactivation_email()
+
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -553,31 +900,140 @@ class SaaSInstance(models.Model):
         Terminer définitivement l'instance (supprime la DB).
         Terminate the instance permanently (deletes DB).
         
-        TODO Phase 2: Implement database deletion
+        Supprime la base de données PostgreSQL via l'API RPC.
+        Deletes the PostgreSQL database via RPC API.
+
+        Restricted to SaaS Administrator group only.
         """
         self.ensure_one()
         
+        # Check if user is SaaS Administrator
+        if not self.env.user.has_group('saas_manager.group_saas_admin'):
+            raise UserError(
+                _('Only SaaS Administrators can terminate instances.')
+            )
+
         if self.state == 'terminated':
             raise UserError(_('Instance is already terminated.'))
         
-        # TODO Phase 2: Delete PostgreSQL database
-        _logger.warning(f"TODO Phase 2: Delete database {self.database_name}")
-        
-        self.write({
-            'state': 'terminated',
-            'active': False,
-        })
-        
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': _('Instance Terminated'),
-                'message': _('Instance %s has been terminated') % self.name,
-                'type': 'warning',
-                'sticky': False,
+        try:
+            # Delete the PostgreSQL database via RPC
+            self._delete_database()
+
+            # Update instance state
+            self.write({
+                'state': 'terminated',
+                'active': False,
+            })
+
+            _logger.info(f"Instance {self.name} ({self.database_name}) terminated successfully")
+
+            # Send termination email to customer
+            self._send_termination_email()
+
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Instance Terminated'),
+                    'message': _('Instance %s has been terminated and database deleted') % self.name,
+                    'type': 'success',
+                    'sticky': False,
+                }
             }
-        }
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.error(f"Failed to terminate instance {self.name}: {str(e)}")
+            raise UserError(
+                _('Failed to terminate instance: %s') % str(e)
+            )
+
+    def _delete_database(self):
+        """
+        Supprimer la base de données PostgreSQL via l'API RPC.
+        Delete the PostgreSQL database via RPC API.
+
+        Uses the drop_database RPC service.
+
+        Raises:
+            UserError: If deletion fails
+        """
+        self.ensure_one()
+
+        base_url = None
+
+        try:
+            # Get server details
+            server = self.server_id
+            base_url = server.server_url.rstrip('/')
+            master_password = server.master_password
+
+            _logger.info(f"Deleting database {self.database_name} on server {server.name}")
+            _logger.info(f"Using server URL: {base_url}")
+
+            # Endpoint for database operations
+            rpc_url = f"{base_url}/jsonrpc"
+
+            # Payload for dropping the database
+            payload = {
+                'jsonrpc': '2.0',
+                'method': 'call',
+                'params': {
+                    'service': 'db',
+                    'method': 'drop',
+                    'args': [
+                        master_password,        # master password
+                        self.database_name,     # database name to drop
+                    ]
+                },
+                'id': 1
+            }
+
+            _logger.info(f"Dropping database via RPC: {self.database_name}")
+
+            # Make RPC call
+            response = requests.post(
+                rpc_url,
+                json=payload,
+                timeout=300  # Allow up to 5 minutes for database deletion
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            # Check for RPC errors
+            if 'error' in result and result['error']:
+                error_data = result['error'].get('data', {})
+                error_msg = error_data.get('message', str(result['error']))
+                _logger.warning(f"RPC Error: {error_msg}")
+                raise UserError(
+                    _("Failed to delete database via RPC.\n\nError: %s") % error_msg
+                )
+
+            _logger.info(f"Database {self.database_name} deleted successfully")
+            return True
+
+        except requests.exceptions.Timeout:
+            _logger.error(f"Database deletion timed out for {self.database_name}")
+            raise UserError(
+                _("Database deletion timed out.\n\n"
+                  "Please try again or contact support.")
+            )
+        except requests.exceptions.RequestException as e:
+            _logger.exception(f"Request error during database deletion")
+            raise UserError(
+                _("Failed to connect to Odoo RPC endpoint.\n\n"
+                  "URL: %s\n\n"
+                  "Error: %s") % (base_url, str(e))
+            )
+        except UserError:
+            raise
+        except Exception as e:
+            _logger.exception(f"Unexpected error in _delete_database")
+            raise UserError(
+                _("An unexpected error occurred while deleting the database.\n\nError: %s") % str(e)
+            )
 
     def action_access_instance(self):
         """
@@ -592,8 +1048,8 @@ class SaaSInstance(models.Model):
         if self.state not in ['active', 'suspended']:
             raise UserError(_('Instance must be active to access it.'))
         
-        instance_url = f"https://{self.domain}"
-        
+        instance_url = f"{self.protocol}://{self.domain}"
+
         return {
             'type': 'ir.actions.act_url',
             'url': instance_url,
@@ -665,3 +1121,24 @@ class SaaSInstance(models.Model):
                 
             except Exception as e:
                 _logger.error(f"Limit check failed for {instance.name}: {str(e)}")
+
+    @api.model
+    def create(self, vals):
+        """
+        Créer une nouvelle instance SaaS.
+        Create a new SaaS instance.
+
+        Assure que partner_id est toujours défini avec l'utilisateur actuel par défaut.
+        Ensures that partner_id is always set to the current user's partner by default.
+
+        Args:
+            vals (dict): Values for the new instance
+
+        Returns:
+            SaaSInstance: The created instance
+        """
+        # Si partner_id n'est pas fourni, utiliser le partenaire de l'utilisateur actuel
+        if not vals.get('partner_id') and self.env.user.partner_id:
+            vals['partner_id'] = self.env.user.partner_id.id
+
+        return super().create(vals)
