@@ -5,7 +5,7 @@
 RPC API endpoints for master server to send commands to client instance
 """
 
-from odoo import http
+from odoo import http, fields
 from odoo.http import request
 import logging
 
@@ -14,13 +14,29 @@ _logger = logging.getLogger(__name__)
 
 class SaasRPCAPI(http.Controller):
     """
-    RPC API endpoints for master server to send commands to client instance
+    RPC API endpoints for master server to send commands to client instance.
+    
+    SECURITY WARNING:
+    -----------------
+    These endpoints use auth='public' to allow master-to-client communication.
+    
+    In production environments, you should:
+    1. Implement API key authentication
+    2. Add IP whitelist for master server
+    3. Use HTTPS/TLS for all communications
+    4. Implement rate limiting
+    5. Add request signature verification
+    
+    Current implementation is suitable for POC/testing only.
     """
     
     @http.route('/saas/set_user_limit', type='json', auth='public', methods=['POST'], csrf=False)
     def set_user_limit(self, instance_uuid, user_limit, **kwargs):
         """
-        Set user limit for this instance (called by master)
+        Set user limit for this instance (called by master).
+        
+        SECURITY: This endpoint is publicly accessible for POC.
+        In production, implement proper authentication.
         
         Args:
             instance_uuid: Unique identifier of instance
@@ -42,7 +58,7 @@ class SaasRPCAPI(http.Controller):
             
             config.write({
                 'user_limit': user_limit,
-                'last_sync_date': request.env['ir.fields'].Datetime.now(),
+                'last_sync_date': fields.Datetime.now(),
                 'sync_status': 'success',
             })
             
@@ -65,7 +81,10 @@ class SaasRPCAPI(http.Controller):
     @http.route('/saas/get_users_count', type='json', auth='public', methods=['POST'], csrf=False)
     def get_users_count(self, instance_uuid, **kwargs):
         """
-        Get current user count (called by master)
+        Get current user count (called by master).
+        
+        SECURITY: This endpoint is publicly accessible for POC.
+        In production, implement proper authentication.
         
         Args:
             instance_uuid: Unique identifier of instance
@@ -102,7 +121,11 @@ class SaasRPCAPI(http.Controller):
     @http.route('/saas/get_status', type='json', auth='public', methods=['POST'], csrf=False)
     def get_status(self, instance_uuid, **kwargs):
         """
-        Get instance status and health info (called by master)
+        Get instance status and health info (called by master).
+        
+        SECURITY: This endpoint is publicly accessible for POC.
+        In production, implement proper authentication to prevent
+        information disclosure.
         
         Args:
             instance_uuid: Unique identifier of instance

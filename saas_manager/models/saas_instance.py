@@ -1070,6 +1070,10 @@ class SaaSInstance(models.Model):
         Calls the /saas/set_user_limit endpoint on the client instance
         to update the user limit enforced by saas_client_agent module.
         
+        NOTE: Currently uses database_name as instance_uuid for lookup.
+        This assumes the client instance was configured with the same UUID.
+        For production, consider synchronizing UUIDs during provisioning.
+        
         Returns:
             bool: True if successful, False otherwise
         """
@@ -1087,7 +1091,7 @@ class SaaSInstance(models.Model):
                 'jsonrpc': '2.0',
                 'method': 'call',
                 'params': {
-                    'instance_uuid': self.database_name,  # Use database name as UUID
+                    'instance_uuid': self.database_name,  # NOTE: Using database name as UUID identifier
                     'user_limit': self.plan_id.user_limit,
                 },
                 'id': 1

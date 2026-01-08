@@ -253,12 +253,74 @@ See the `saas_manager` module documentation for details on:
 
 ## Security
 
-- The RPC endpoints use `auth='public'` to allow master-to-client communication
-- Access rights are controlled via `saas.client.config` model permissions
-- In production, consider implementing:
-  - API key authentication
-  - IP whitelist for master server
-  - Rate limiting
+⚠️ **IMPORTANT SECURITY NOTICE** ⚠️
+
+The current implementation includes the following security considerations:
+
+### Current Security Status (POC/Development)
+
+The RPC endpoints use `auth='public'` to allow master-to-client communication without authentication. This is **NOT suitable for production** environments.
+
+**Known Security Issues:**
+- Public RPC endpoints without authentication
+- Hard-coded credentials in sync method
+- No API key or token authentication
+- No IP whitelisting
+- No rate limiting
+- Database name used as UUID (predictable)
+
+### Recommended Production Security
+
+Before deploying to production, implement the following security measures:
+
+1. **API Key Authentication**
+   - Generate unique API keys for each instance
+   - Store keys securely in `ir.config_parameter`
+   - Validate API keys in RPC endpoints
+
+2. **IP Whitelisting**
+   - Configure firewall rules to allow only master server IP
+   - Add IP validation in controller methods
+   - Use VPN or private network for master-client communication
+
+3. **HTTPS/TLS**
+   - Always use HTTPS for all communications
+   - Implement certificate pinning
+   - Use strong TLS configurations
+
+4. **Rate Limiting**
+   - Implement request rate limiting on RPC endpoints
+   - Add throttling for failed authentication attempts
+   - Monitor for suspicious activity
+
+5. **Request Signing**
+   - Implement HMAC signature verification
+   - Use timestamp-based nonce to prevent replay attacks
+   - Validate request integrity
+
+6. **UUID Management**
+   - Use cryptographically secure UUIDs
+   - Synchronize UUIDs during instance provisioning
+   - Store UUID mapping securely in master
+
+### Example Secure Implementation
+
+```python
+# TODO: Implement secure authentication
+@http.route('/saas/set_user_limit', type='json', auth='public', methods=['POST'], csrf=False)
+def set_user_limit(self, instance_uuid, user_limit, api_key=None, **kwargs):
+    # Validate API key
+    if not self._validate_api_key(api_key):
+        return {'success': False, 'error': 'Invalid API key'}
+    
+    # Validate IP whitelist
+    if not self._validate_master_ip(request.httprequest.remote_addr):
+        return {'success': False, 'error': 'Unauthorized IP'}
+    
+    # Continue with business logic...
+```
+
+For development and testing environments, the current implementation is acceptable.
 
 ## Future Enhancements
 

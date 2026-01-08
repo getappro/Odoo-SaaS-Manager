@@ -161,6 +161,11 @@ class SaasClientConfig(models.Model):
         """
         Sync configuration with master server.
         Master will update user_limit and other settings.
+        
+        TODO: Implement proper authentication mechanism
+        - Use API key authentication
+        - Store secure credentials in ir.config_parameter
+        - Implement token-based authentication
         """
         self.ensure_one()
         
@@ -175,6 +180,10 @@ class SaasClientConfig(models.Model):
             import requests
             import json
             
+            # TODO: Replace with proper API authentication
+            # Current implementation uses hard-coded credentials for POC
+            # Production should use secure token-based auth
+            
             # Call master RPC endpoint
             payload = {
                 'jsonrpc': '2.0',
@@ -184,8 +193,8 @@ class SaasClientConfig(models.Model):
                     'method': 'execute_kw',
                     'args': [
                         self.master_database,
-                        1,  # admin user
-                        'admin',  # TODO: Use proper authentication
+                        1,  # TODO: Replace with proper user ID
+                        'admin',  # TODO: Replace with secure API token
                         'saas.instance',
                         'sync_client_config',
                         [self.instance_uuid],

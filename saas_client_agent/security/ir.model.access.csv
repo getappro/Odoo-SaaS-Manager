@@ -1,4 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_saas_client_config_admin,access_saas_client_config_admin,model_saas_client_config,group_saas_client_admin,1,1,1,1
 access_saas_client_config_user,access_saas_client_config_user,model_saas_client_config,base.group_user,1,0,0,0
-access_saas_client_config_public,access_saas_client_config_public,model_saas_client_config,,1,1,1,0
+access_saas_client_config_system,access_saas_client_config_system,model_saas_client_config,base.group_system,1,1,1,0
