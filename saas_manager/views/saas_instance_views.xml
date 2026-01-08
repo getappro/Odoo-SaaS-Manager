@@ -19,6 +19,12 @@
                                 string="Access Instance"
                                 class="oe_highlight"
                                 invisible="state not in ['active', 'suspended']"/>
+                        <button name="action_sync_user_limit" 
+                                type="object" 
+                                string="Sync User Limit"
+                                class="btn-info"
+                                invisible="state != 'active'"
+                                help="Send user limit to client instance"/>
                         <button name="action_suspend" 
                                 type="object" 
                                 string="Suspend"
