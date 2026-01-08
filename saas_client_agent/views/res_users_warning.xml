@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        
+        <!-- Warning Banner Template (Future Enhancement) -->
+        <!-- This can be used to show warnings in the UI when approaching user limit -->
+        
+        <template id="user_limit_warning_banner" name="User Limit Warning Banner">
+            <div class="alert alert-warning" role="alert" style="margin: 10px;">
+                <strong>Warning:</strong> You are approaching your user limit.
+                <span>Current: <t t-esc="current_users"/> / <t t-esc="user_limit"/> users (<t t-esc="percentage"/>%)</span>
+                <br/>
+                Please contact your administrator to upgrade your plan.
+            </div>
+        </template>
+        
+    </data>
+</odoo>

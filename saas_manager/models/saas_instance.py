@@ -196,11 +196,14 @@ class SaaSInstance(models.Model):
         Calcule le nombre d'utilisateurs actifs.
         Compute number of active users.
         
-        TODO Phase 2: Connect to instance database and count users
+        Fetches user count from client instance via RPC if instance is active.
         """
         for instance in self:
-            # Placeholder - TODO Phase 2: Query instance database
-            instance.current_users = 0
+            if instance.state == 'active':
+                # Try to fetch from instance via RPC
+                instance.current_users = instance._get_users_count_from_instance()
+            else:
+                instance.current_users = 0
 
     def _compute_storage_used(self):
         """
@@ -1055,6 +1058,132 @@ class SaaSInstance(models.Model):
             'url': instance_url,
             'target': 'new',
         }
+
+    # ========================================
+    # SaaS Client Agent Integration (RPC)
+    # ========================================
+
+    def _send_user_limit_to_instance(self):
+        """
+        Send user limit to client instance via RPC.
+        
+        Calls the /saas/set_user_limit endpoint on the client instance
+        to update the user limit enforced by saas_client_agent module.
+        
+        NOTE: Currently uses database_name as instance_uuid for lookup.
+        This assumes the client instance was configured with the same UUID.
+        For production, consider synchronizing UUIDs during provisioning.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        self.ensure_one()
+        
+        if not self.domain or self.state not in ['active', 'suspended']:
+            _logger.warning(f"Cannot sync user limit for instance {self.name}: "
+                          f"domain={self.domain}, state={self.state}")
+            return False
+        
+        try:
+            instance_url = f"{self.protocol}://{self.domain}"
+            
+            payload = {
+                'jsonrpc': '2.0',
+                'method': 'call',
+                'params': {
+                    'instance_uuid': self.database_name,  # NOTE: Using database name as UUID identifier
+                    'user_limit': self.plan_id.user_limit,
+                },
+                'id': 1
+            }
+            
+            response = requests.post(
+                f"{instance_url}/saas/set_user_limit",
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    _logger.info(f"User limit sent to instance {self.name}: {self.plan_id.user_limit}")
+                    return True
+            
+            _logger.warning(f"Failed to send user limit to {self.name}: {response.text}")
+            return False
+            
+        except Exception as e:
+            _logger.error(f"Error sending user limit to instance {self.name}: {str(e)}")
+            return False
+
+    def _get_users_count_from_instance(self):
+        """
+        Get current user count from client instance via RPC.
+        
+        Calls the /saas/get_users_count endpoint on the client instance.
+        
+        Returns:
+            int: Current user count, or 0 if unable to fetch
+        """
+        self.ensure_one()
+        
+        if not self.domain or self.state not in ['active', 'suspended']:
+            return 0
+        
+        try:
+            instance_url = f"{self.protocol}://{self.domain}"
+            
+            payload = {
+                'jsonrpc': '2.0',
+                'method': 'call',
+                'params': {
+                    'instance_uuid': self.database_name,
+                },
+                'id': 1
+            }
+            
+            response = requests.post(
+                f"{instance_url}/saas/get_users_count",
+                json=payload,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return result.get('current_users', 0)
+            
+            return 0
+            
+        except Exception as e:
+            _logger.error(f"Error getting user count from instance {self.name}: {str(e)}")
+            return 0
+
+    def action_sync_user_limit(self):
+        """
+        Manually sync user limit to instance.
+        
+        Button action in instance form view to trigger user limit sync.
+        """
+        self.ensure_one()
+        
+        if self._send_user_limit_to_instance():
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('User Limit Synced'),
+                    'message': _('User limit of %d sent to instance successfully') % self.plan_id.user_limit,
+                    'type': 'success',
+                    'sticky': False,
+                }
+            }
+        else:
+            raise UserError(_('Failed to sync user limit with instance. Check logs for details.'))
+
+    # ========================================
+    # CRON Jobs
+    # ========================================
 
     @api.model
     def cron_check_subscription_expiry(self):

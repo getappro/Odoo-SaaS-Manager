@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        
+        <!-- Security Group: SaaS Client Admin -->
+        <record id="group_saas_client_admin" model="res.groups">
+            <field name="name">SaaS Client Administrator</field>
+            <field name="category_id" ref="base.module_category_administration"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Users in this group can configure SaaS client settings</field>
+        </record>
+        
+        <!-- Record Rules -->
+        <record id="saas_client_config_rule" model="ir.rule">
+            <field name="name">SaaS Client Config: Full Access</field>
+            <field name="model_id" ref="model_saas_client_config"/>
+            <field name="domain_force">[(1, '=', 1)]</field>
+            <field name="perm_read" eval="1"/>
+            <field name="perm_write" eval="1"/>
+            <field name="perm_create" eval="1"/>
+            <field name="perm_unlink" eval="1"/>
+        </record>
+        
+    </data>
+</odoo>
