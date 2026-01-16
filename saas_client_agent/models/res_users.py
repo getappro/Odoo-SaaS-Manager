@@ -44,22 +44,5 @@ class ResUsers(models.Model):
                     f"User limit critical: {config.current_users}/{config.user_limit} "
                     f"({config.users_percentage:.1f}%) - Instance: {config.instance_uuid}"
                 )
-                
-                # Show in-app notification
-                try:
-                    self.env.user.notify_warning(
-                        _(
-                            "Approaching User Limit: %d/%d users (%.0f%%). "
-                            "Consider upgrading your plan soon."
-                        ) % (config.current_users, config.user_limit, config.users_percentage),
-                        title=_("User Limit Warning"),
-                        sticky=False,
-                    )
-                except Exception as e:
-                    # Fallback if notify_warning is not available
-                    _logger.warning(
-                        f"Could not send notification: {e}. "
-                        f"User limit: {config.current_users}/{config.user_limit}"
-                    )
         
         return super().create(vals_list)

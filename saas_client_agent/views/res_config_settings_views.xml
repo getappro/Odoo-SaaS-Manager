@@ -31,16 +31,10 @@
                                 </div>
                                 <div class="row mt-3">
                                     <div class="col-12">
-                                        <div class="progress" style="height: 25px;">
-                                            <div class="progress-bar" 
-                                                 role="progressbar"
-                                                 t-att-class="'bg-success' if saas_users_percentage &lt; 80 else ('bg-warning' if saas_users_percentage &lt; 95 else 'bg-danger')"
-                                                 t-attf-style="width: #{saas_users_percentage}%"
-                                                 t-attf-aria-valuenow="#{saas_users_percentage}"
-                                                 aria-valuemin="0" 
-                                                 aria-valuemax="100">
-                                                <field name="saas_users_percentage"/> %
-                                            </div>
+                                        <div class="alert alert-info">
+                                            <i class="fa fa-info-circle"/> 
+                                            <strong>Usage: </strong>
+                                            <field name="saas_users_percentage" widget="percentage" readonly="1"/> of capacity used
                                         </div>
                                     </div>
                                 </div>
