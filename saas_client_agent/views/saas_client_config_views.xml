@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- SaaS Client Configuration Form View -->
+    <record id="saas_client_config_view_form" model="ir.ui.view">
+        <field name="name">saas.client.config.form</field>
+        <field name="model">saas.client.config</field>
+        <field name="arch" type="xml">
+            <form string="SaaS Client Configuration">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_sync_with_master"
+                                type="object"
+                                class="oe_stat_button"
+                                icon="fa-refresh">
+                            <div class="o_field_widget o_stat_info">
+                                <span class="o_stat_text">Sync with</span>
+                                <span class="o_stat_text">Master</span>
+                            </div>
+                        </button>
+                    </div>
+                    
+                    <group>
+                        <group name="instance_info" string="Instance Information">
+                            <field name="instance_uuid" readonly="1"/>
+                            <field name="last_heartbeat" readonly="1"/>
+                            <field name="heartbeat_interval"/>
+                        </group>
+                        
+                        <group name="master_connection" string="Master Server Connection">
+                            <field name="master_url"/>
+                            <field name="master_api_key" password="True"/>
+                        </group>
+                    </group>
+                    
+                    <group>
+                        <group name="limits" string="Subscription Limits">
+                            <field name="user_limit"/>
+                            <field name="storage_limit_gb"/>
+                            <field name="is_limit_enforced"/>
+                        </group>
+                        
+                        <group name="usage" string="Current Usage">
+                            <field name="current_users" readonly="1"/>
+                            <field name="users_percentage" widget="percentage" readonly="1"/>
+                            <field name="current_storage_gb" readonly="1"/>
+                            <field name="storage_percentage" widget="percentage" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    
+    <!-- SaaS Client Configuration Tree View -->
+    <record id="saas_client_config_view_tree" model="ir.ui.view">
+        <field name="name">saas.client.config.tree</field>
+        <field name="model">saas.client.config</field>
+        <field name="arch" type="xml">
+            <tree string="SaaS Client Configuration">
+                <field name="instance_uuid"/>
+                <field name="current_users"/>
+                <field name="user_limit"/>
+                <field name="users_percentage" widget="percentage"/>
+                <field name="last_heartbeat"/>
+            </tree>
+        </field>
+    </record>
+    
+    <!-- Action -->
+    <record id="saas_client_config_action" model="ir.actions.act_window">
+        <field name="name">SaaS Configuration</field>
+        <field name="res_model">saas.client.config</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure your SaaS client instance
+            </p>
+            <p>
+                Set up connection to master server and configure subscription limits.
+            </p>
+        </field>
+    </record>
+    
+    <!-- Restrict menu visibility to system administrators only -->
+    <menuitem id="menu_saas_client_root"
+              name="SaaS Client"
+              sequence="100"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_saas_client_config"
+              name="Configuration"
+              parent="menu_saas_client_root"
+              action="saas_client_config_action"
+              sequence="10"
+              groups="base.group_system"/>
+    
+</odoo>

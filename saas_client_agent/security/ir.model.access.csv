@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_saas_client_config_system,saas.client.config system,model_saas_client_config,base.group_system,1,1,1,1
+access_saas_client_config_user,saas.client.config user,model_saas_client_config,base.group_user,1,0,0,0
+access_saas_heartbeat_system,saas.heartbeat system,model_saas_heartbeat,base.group_system,1,1,1,1

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    
+    <t t-name="saas_client_agent.UsageBanner">
+        <div t-if="state.showWarning" 
+             t-attf-class="alert {{ alertClass }} mb-0 d-flex align-items-center" 
+             role="alert">
+            <i class="fa fa-exclamation-triangle fa-2x me-3"/>
+            <div class="flex-grow-1">
+                <strong>User Limit Warning:</strong>
+                <t t-esc="state.currentUsers"/> / <t t-esc="state.userLimit"/> users 
+                (<t t-esc="state.percentage"/>% used)
+                <br/>
+                <small>
+                    <a href="/web#menu_id=base.menu_administration&amp;action=base.action_res_config_settings">
+                        Upgrade your plan
+                    </a> to add more users
+                </small>
+            </div>
+            <div class="ms-3">
+                <div class="progress" style="width: 150px; height: 20px;">
+                    <div t-attf-class="progress-bar {{ progressBarClass }}" 
+                         role="progressbar"
+                         t-attf-style="width: {{ state.percentage }}%"
+                         t-attf-aria-valuenow="{{ state.percentage }}"
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        <t t-esc="state.percentage"/>%
+                    </div>
+                </div>
+            </div>
+        </div>
+    </t>
+    
+</templates>
