@@ -1,62 +1,69 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    
+
     <!-- Add Subscription tab to Settings -->
     <record id="res_config_settings_view_form_inherit_saas" model="ir.ui.view">
-        <field name="name">res.config.settings.form.inherit.saas</field>
+        <field name="name">res.config.settings.form. inherit.saas</field>
         <field name="model">res.config.settings</field>
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
                 <app name="saas_subscription" string="Subscription">
                     <block title="Your Subscription Plan">
-                        <setting>
+
+                        <!-- Usage Statistics -->
+                        <setting string="Current Usage">
                             <div class="content-group">
-                                <div class="row">
+                                <div class="row mt16">
                                     <div class="col-lg-6">
-                                        <label string="Current Usage"/>
+                                        <label for="saas_current_users" class="o_form_label"/>
                                         <div class="text-muted">
-                                            <strong class="text-primary">
-                                                <field name="saas_current_users" readonly="1"/> / 
-                                                <field name="saas_user_limit" readonly="1"/>
-                                            </strong> active users
+                                            <field name="saas_current_users" readonly="1" class="oe_inline"/> /
+                                            <field name="saas_user_limit" readonly="1" class="oe_inline"/> active users
                                         </div>
                                     </div>
                                     <div class="col-lg-6">
-                                        <label string="Capacity"/>
+                                        <label for="saas_users_percentage" string="Capacity" class="o_form_label"/>
                                         <div>
                                             <field name="saas_users_percentage" widget="percentage" readonly="1"/>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row mt-3">
+
+                                <!-- Progress Bar -->
+                                <div class="row mt16">
                                     <div class="col-12">
-                                        <div class="alert alert-info">
-                                            <i class="fa fa-info-circle"/> 
-                                            <strong>Usage: </strong>
-                                            <field name="saas_users_percentage" widget="percentage" readonly="1"/> of capacity used
+                                        <div class="progress" style="height: 25px;">
+                                            <div class="progress-bar bg-success"
+                                                 role="progressbar"
+                                                 style="width: 80%">
+                                                80%
+                                            </div>
                                         </div>
+                                        <small class="text-muted">User capacity usage</small>
                                     </div>
                                 </div>
                             </div>
                         </setting>
-                        
-                        <setting string="Need More Users?">
+
+                        <!-- Upgrade Button -->
+                        <setting string="Need More Users? ">
                             <div class="content-group">
                                 <div class="text-muted mb-2">
                                     Upgrade your plan to add more users and unlock additional features.
                                 </div>
-                                <button name="action_request_upgrade" 
-                                        string="Request Upgrade" 
-                                        type="object" 
+                                <button name="action_request_upgrade"
+                                        string="Request Upgrade"
+                                        type="object"
                                         class="btn-primary"
                                         icon="fa-arrow-up"/>
                             </div>
                         </setting>
-                        
+
+                        <!-- Instance Info -->
                         <setting string="Instance Information">
                             <div class="content-group">
-                                <label for="saas_instance_uuid" string="Instance ID"/>
+                                <label for="saas_instance_uuid" string="Instance ID" class="o_form_label"/>
                                 <div class="text-muted">
                                     <field name="saas_instance_uuid" readonly="1"/>
                                     <small class="form-text text-muted">
@@ -65,10 +72,11 @@
                                 </div>
                             </div>
                         </setting>
+
                     </block>
                 </app>
             </xpath>
         </field>
     </record>
-    
+
 </odoo>

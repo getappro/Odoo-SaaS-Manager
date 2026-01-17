@@ -1,10 +1,12 @@
 /** @odoo-module **/
 
-import { registry } from "@web/core/registry";
 import { Component, useState, onWillStart } from "@odoo/owl";
+import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 
 export class SaaSUsageBanner extends Component {
+    static template = "saas_client_agent.UsageBanner";
+
     setup() {
         this.rpc = useService("rpc");
         this.state = useState({
@@ -21,18 +23,24 @@ export class SaaSUsageBanner extends Component {
     }
 
     async loadUsageData() {
-        const data = await this.rpc("/web/dataset/call_kw/res.users/get_saas_usage_info", {
-            model: "res.users",
-            method: "get_saas_usage_info",
-            args: [],
-            kwargs: {},
-        });
-        
-        Object.assign(this.state, data);
+        try {
+            const data = await this.rpc("/web/dataset/call_kw", {
+                model: "res. users",
+                method: "get_saas_usage_info",
+                args: [],
+                kwargs: {},
+            });
+
+            if (data) {
+                Object.assign(this.state, data);
+            }
+        } catch (error) {
+            console. error("Failed to load SaaS usage data:", error);
+        }
     }
 
     get alertClass() {
-        if (this.state.percentage >= 95) return 'alert-danger';
+        if (this. state.percentage >= 95) return 'alert-danger';
         if (this.state.percentage >= 80) return 'alert-warning';
         return 'alert-info';
     }
@@ -44,8 +52,7 @@ export class SaaSUsageBanner extends Component {
     }
 }
 
-SaaSUsageBanner.template = "saas_client_agent.UsageBanner";
-
-registry.category("main_components").add("SaaSUsageBanner", {
-    Component: SaaSUsageBanner,
-});
+// Register as system bar component (appears at top of interface)
+registry.category("systray").add("SaaSUsageBanner", {
+    Component:  SaaSUsageBanner,
+}, { sequence: 100 });
